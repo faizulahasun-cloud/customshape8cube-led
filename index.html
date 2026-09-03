@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>8x8x8 LED Cube Console - Script Engine</title>
+
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -25,7 +26,8 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                Roboto, Helvetica, Arial, sans-serif;
         }
 
         body {
@@ -215,743 +217,898 @@
         }
     </style>
 </head>
+
 <body>
 
-    <div class="console-container">
-        <h2>8x8x8 CUBE ADVANCED ENGINE</h2>
+<div class="console-container">
 
-        <div class="status-panel" id="connectionLog">
-            INTERFACE STATUS: DISCONNECTED
-        </div>
+    <h2>8x8x8 CUBE ADVANCED ENGINE</h2>
 
-        <button class="btn btn-primary" onclick="connectBLE()">
-            Pair HM-10 BLE Module
-        </button>
-
-        <div class="control-group">
-            <button class="btn btn-success" onclick="transmitModeToken('A')">
-                Auto Mode ('A')
-            </button>
-
-            <button class="btn btn-warning" onclick="transmitModeToken('M')">
-                Manual Mode ('M')
-            </button>
-        </div>
-
-        <button class="btn btn-primary" onclick="transmitModeToken('N')">
-            Next Pattern Step ('N')
-        </button>
-
-        <button class="btn btn-s-mode" onclick="enterSMode()">
-            S MODE
-        </button>
-
-        <div class="engine-panel">
-            <h3>CUSTOM .TXT CODE ENGINE (MODE 'S')</h3>
-
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
-                Upload a .txt script file or write XYZ code. Script automatically saves to local browser storage.
-            </p>
-
-            <div class="file-input-wrapper">
-                <label class="file-label" for="txtFileInput" id="fileInputLabel">
-                    Choose Script File (.txt)
-                </label>
-
-                <input
-                    type="file"
-                    id="txtFileInput"
-                    accept=".txt"
-                    onchange="handleFileLoad(event)"
-                >
-            </div>
-
-            <textarea
-                id="scriptIDE"
-                placeholder="// Enter your animation commands here...&#10;set(0,0,0)&#10;set(7,7,7)&#10;delay 250&#10;set(1,1,1)&#10;delay 250"
-            ></textarea>
-
-            <div class="control-group">
-                <button
-                    class="btn btn-primary"
-                    style="background-color: #475569;"
-                    onclick="saveToStorage()"
-                >
-                    Save Script to Storage
-                </button>
-
-                <button
-                    class="btn btn-primary"
-                    style="background-color: #475569;"
-                    onclick="parseAndCompileScript()"
-                >
-                    Compile Code Engine
-                </button>
-            </div>
-
-            <button
-                class="btn btn-s-mode"
-                id="runScriptButton"
-                onclick="executeSModeTransferEngine()"
-                disabled
-            >
-                DRAW / RUN CUSTOM SCRIPT
-            </button>
-        </div>
-
-        <div class="range-container">
-            <div class="range-label">
-                <span>BRIGHTNESS CONTROL:</span>
-                <span id="brightnessVal">5</span>
-            </div>
-
-            <input
-                type="range"
-                id="brightnessRange"
-                min="2"
-                max="8"
-                value="5"
-                oninput="updateBrightness(this.value)"
-            >
-        </div>
-
-        <button
-            class="btn btn-danger"
-            style="margin-top: 20px; margin-bottom: 0;"
-            onclick="disconnectBLE()"
-        >
-            Disconnect Session
-        </button>
+    <div class="status-panel" id="connectionLog">
+        INTERFACE STATUS: DISCONNECTED
     </div>
 
-    <script>
-        let targetDevice = null;
-        let targetDataCharacteristic = null;
+    <button class="btn btn-primary" onclick="connectBLE()">
+        Pair HM-10 BLE Module
+    </button>
 
-        const HM10_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
-        const HM10_CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
+    <div class="control-group">
 
-        let scriptFrames = [];
-        let scriptPlaybackRunning = false;
-        let scriptPlaybackToken = 0;
-        let bleWriteQueue = Promise.resolve();
+        <button class="btn btn-success"
+                onclick="transmitModeToken('A')">
+            Auto Mode ('A')
+        </button>
 
-        let webCubeMode = "NONE";
+        <button class="btn btn-warning"
+                onclick="transmitModeToken('M')">
+            Manual Mode ('M')
+        </button>
 
-        window.addEventListener('DOMContentLoaded', () => {
-            const cachedScript = localStorage.getItem('cube_cached_script');
+    </div>
 
-            if (cachedScript) {
-                document.getElementById('scriptIDE').value = cachedScript;
-            }
+    <button class="btn btn-primary"
+            onclick="transmitModeToken('N')">
+        Next Pattern Step ('N')
+    </button>
 
-            updateSModeUI();
-        });
+    <button class="btn btn-s-mode"
+            onclick="enterSMode()">
+        S MODE
+    </button>
 
-        function updateSModeUI() {
-            const runButton = document.getElementById('runScriptButton');
+    <div class="engine-panel">
 
-            runButton.disabled = (
-                webCubeMode !== "S" ||
-                !targetDataCharacteristic
-            );
+        <h3>CUSTOM .TXT CODE ENGINE (MODE 'S')</h3>
+
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
+            Upload a .txt script file or write XYZ code. Script automatically saves to local browser storage.
+        </p>
+
+        <div class="file-input-wrapper">
+
+            <label class="file-label"
+                   for="txtFileInput"
+                   id="fileInputLabel">
+                Choose Script File (.txt)
+            </label>
+
+            <input type="file"
+                   id="txtFileInput"
+                   accept=".txt"
+                   onchange="handleFileLoad(event)">
+        </div>
+
+        <textarea
+            id="scriptIDE"
+            placeholder="// Enter your animation commands here...&#10;set(0,0,0)&#10;set(7,7,7)&#10;delay 250&#10;set(1,1,1)&#10;delay 250"></textarea>
+
+        <div class="control-group">
+
+            <button class="btn btn-primary"
+                    style="background-color: #475569;"
+                    onclick="saveToStorage()">
+                Save Script to Storage
+            </button>
+
+            <button class="btn btn-primary"
+                    style="background-color: #475569;"
+                    onclick="parseAndCompileScript()">
+                Compile Code Engine
+            </button>
+
+        </div>
+
+        <button class="btn btn-s-mode"
+                id="runScriptButton"
+                onclick="executeSModeTransferEngine()"
+                disabled>
+            DRAW / RUN CUSTOM SCRIPT
+        </button>
+
+    </div>
+
+    <div class="range-container">
+
+        <div class="range-label">
+            <span>BRIGHTNESS CONTROL:</span>
+            <span id="brightnessVal">5</span>
+        </div>
+
+        <input type="range"
+               id="brightnessRange"
+               min="2"
+               max="8"
+               value="5"
+               oninput="updateBrightness(this.value)">
+    </div>
+
+    <button class="btn btn-danger"
+            style="margin-top: 20px; margin-bottom: 0;"
+            onclick="disconnectBLE()">
+        Disconnect Session
+    </button>
+
+</div>
+
+<script>
+
+let targetDevice = null;
+let targetDataCharacteristic = null;
+
+const HM10_SERVICE_UUID =
+    "0000ffe0-0000-1000-8000-00805f9b34fb";
+
+const HM10_CHARACTERISTIC_UUID =
+    "0000ffe1-0000-1000-8000-00805f9b34fb";
+
+let scriptFrames = [];
+let scriptPlaybackRunning = false;
+let scriptPlaybackToken = 0;
+
+let bleWriteQueue = Promise.resolve();
+
+let webCubeMode = "NONE";
+
+// --------------------------------------------------
+// UI
+// --------------------------------------------------
+
+function updateSModeUI() {
+
+    const runButton =
+        document.getElementById("runScriptButton");
+
+    runButton.disabled =
+        webCubeMode !== "S" ||
+        !targetDataCharacteristic;
+}
+
+// --------------------------------------------------
+// STORAGE
+// --------------------------------------------------
+
+window.addEventListener("DOMContentLoaded", () => {
+
+    const cachedScript =
+        localStorage.getItem("cube_cached_script");
+
+    if (cachedScript) {
+
+        document.getElementById("scriptIDE").value =
+            cachedScript;
+    }
+
+    updateSModeUI();
+});
+
+function saveToStorage() {
+
+    const currentCode =
+        document.getElementById("scriptIDE").value;
+
+    localStorage.setItem(
+        "cube_cached_script",
+        currentCode
+    );
+
+    alert(
+        "Script saved to browser storage successfully!"
+    );
+}
+
+function handleFileLoad(event) {
+
+    const input = event.target;
+
+    if (
+        !input.files ||
+        input.files.length === 0
+    ) {
+        return;
+    }
+
+    const file = input.files[0];
+
+    document.getElementById(
+        "fileInputLabel"
+    ).innerText = file.name;
+
+    const reader = new FileReader();
+
+    reader.onload = function() {
+
+        document.getElementById(
+            "scriptIDE"
+        ).value = reader.result;
+
+        localStorage.setItem(
+            "cube_cached_script",
+            reader.result
+        );
+    };
+
+    reader.readAsText(file);
+}
+
+// --------------------------------------------------
+// SCRIPT COMPILER
+// --------------------------------------------------
+
+function parseAndCompileScript() {
+
+    scriptFrames = [];
+
+    const rawText =
+        document.getElementById("scriptIDE").value;
+
+    const lines =
+        rawText.split("\n");
+
+    let currentFrameBytes =
+        new Uint8Array(64);
+
+    let hasDataInCurrentFrame =
+        false;
+
+    for (let line of lines) {
+
+        line = line.trim();
+
+        if (
+            line.startsWith("//") ||
+            line.startsWith("#") ||
+            line.length === 0
+        ) {
+            continue;
         }
 
-        function saveToStorage() {
-            const currentCode = document.getElementById('scriptIDE').value;
-
-            localStorage.setItem('cube_cached_script', currentCode);
-
-            alert("Script saved to browser storage successfully!");
-        }
-
-        function handleFileLoad(event) {
-            const input = event.target;
-
-            if (!input.files || input.files.length === 0) return;
-
-            const file = input.files[0];
-
-            document.getElementById('fileInputLabel').innerText = file.name;
-
-            const reader = new FileReader();
-
-            reader.onload = function() {
-                document.getElementById('scriptIDE').value = reader.result;
-
-                localStorage.setItem(
-                    'cube_cached_script',
-                    reader.result
-                );
-            };
-
-            reader.readAsText(file);
-        }
-
-        function parseAndCompileScript() {
-            scriptFrames = [];
-
-            const rawText = document.getElementById('scriptIDE').value;
-
-            const lines = rawText.split('\n');
-
-            let currentFrameBytes = new Uint8Array(64);
-
-            let hasDataInCurrentFrame = false;
-
-            for (let line of lines) {
-
-                line = line.trim();
-
-                if (
-                    line.startsWith('//') ||
-                    line.startsWith('#') ||
-                    line.length === 0
-                ) {
-                    continue;
-                }
-
-                if (
-                    line.toLowerCase().startsWith('delay') ||
-                    line.toLowerCase() === 'next'
-                ) {
-                    if (hasDataInCurrentFrame) {
-
-                        scriptFrames.push(
-                            new Uint8Array(currentFrameBytes)
-                        );
-
-                        currentFrameBytes = new Uint8Array(64);
-
-                        hasDataInCurrentFrame = false;
-                    }
-
-                    continue;
-                }
-
-                const match = line.match(
-                    /set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i
-                );
-
-                if (match) {
-
-                    const x = parseInt(match[1], 10);
-
-                    const y = parseInt(match[2], 10);
-
-                    const z = parseInt(match[3], 10);
-
-                    if (
-                        x >= 0 && x < 8 &&
-                        y >= 0 && y < 8 &&
-                        z >= 0 && z < 8
-                    ) {
-
-                        hasDataInCurrentFrame = true;
-
-                        const byteIndex = (z * 8) + y;
-
-                        const bitIndex = x;
-
-                        currentFrameBytes[byteIndex] |= (1 << bitIndex);
-                    }
-                }
-            }
+        if (
+            line.toLowerCase().startsWith("delay") ||
+            line.toLowerCase() === "next"
+        ) {
 
             if (hasDataInCurrentFrame) {
 
-                scriptFrames.push(currentFrameBytes);
+                scriptFrames.push(
+                    new Uint8Array(
+                        currentFrameBytes
+                    )
+                );
+
+                currentFrameBytes =
+                    new Uint8Array(64);
+
+                hasDataInCurrentFrame = false;
             }
 
-            console.log(
-                "Compiled script frames: ",
-                scriptFrames.length
+            continue;
+        }
+
+        const match =
+            line.match(
+                /set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i
             );
-        }
 
-        async function connectBLE() {
-            const logDisplay = document.getElementById('connectionLog');
+        if (match) {
 
-            logDisplay.innerText =
-                "REQUESTING BLE DEVICE...";
+            const x =
+                parseInt(match[1], 10);
 
-            logDisplay.style.color =
-                "var(--warning)";
+            const y =
+                parseInt(match[2], 10);
 
-            try {
-
-                targetDevice = await navigator.bluetooth.requestDevice({
-                    filters: [
-                        {
-                            services: [HM10_SERVICE_UUID]
-                        }
-                    ],
-                    optionalServices: [HM10_SERVICE_UUID]
-                });
-
-                logDisplay.innerText =
-                    "CONNECTING TO GATT LAYER...";
-
-                const server =
-                    await targetDevice.gatt.connect();
-
-                logDisplay.innerText =
-                    "PARSING HM-10 SERVICE...";
-
-                const service =
-                    await server.getPrimaryService(
-                        HM10_SERVICE_UUID
-                    );
-
-                logDisplay.innerText =
-                    "ACQUIRING RX/TX CHARACTERISTIC...";
-
-                targetDataCharacteristic =
-                    await service.getCharacteristic(
-                        HM10_CHARACTERISTIC_UUID
-                    );
-
-                logDisplay.innerText =
-                    "INTERFACE STATUS: CONNECTED";
-
-                logDisplay.style.color =
-                    "var(--success)";
-
-                webCubeMode = "NONE";
-
-                updateSModeUI();
-
-                targetDevice.addEventListener(
-                    'gattserverdisconnected',
-                    onDisconnected
-                );
-
-            } catch (error) {
-
-                console.error(error);
-
-                logDisplay.innerText =
-                    "CONNECTION FAILED";
-
-                logDisplay.style.color =
-                    "var(--danger)";
-
-                targetDataCharacteristic = null;
-
-                webCubeMode = "NONE";
-
-                updateSModeUI();
-
-                alert(
-                    "BLE Handshake failed: " +
-                    error.message
-                );
-            }
-        }
-
-        function onDisconnected() {
-
-            const logDisplay =
-                document.getElementById('connectionLog');
-
-            logDisplay.innerText =
-                "INTERFACE STATUS: DISCONNECTED";
-
-            logDisplay.style.color =
-                "var(--warning)";
-
-            targetDataCharacteristic = null;
-
-            scriptPlaybackRunning = false;
-
-            scriptPlaybackToken++;
-
-            webCubeMode = "NONE";
-
-            updateSModeUI();
-        }
-
-        function disconnectBLE() {
-
-            scriptPlaybackRunning = false;
-
-            scriptPlaybackToken++;
-
-            webCubeMode = "NONE";
-
-            updateSModeUI();
+            const z =
+                parseInt(match[3], 10);
 
             if (
-                targetDevice &&
-                targetDevice.gatt.connected
+                x >= 0 && x < 8 &&
+                y >= 0 && y < 8 &&
+                z >= 0 && z < 8
             ) {
-                targetDevice.gatt.disconnect();
+
+                hasDataInCurrentFrame =
+                    true;
+
+                const byteIndex =
+                    (z * 8) + y;
+
+                const bitIndex = x;
+
+                currentFrameBytes[
+                    byteIndex
+                ] |= (1 << bitIndex);
             }
         }
+    }
 
-        async function updateBrightness(val) {
+    if (hasDataInCurrentFrame) {
 
-            document.getElementById(
-                'brightnessVal'
-            ).innerText = val;
+        scriptFrames.push(
+            new Uint8Array(
+                currentFrameBytes
+            )
+        );
+    }
 
-            const headerBuffer =
-                new TextEncoder().encode('B');
+    console.log(
+        "Compiled script frames:",
+        scriptFrames.length
+    );
+}
 
-            const dataBuffer =
-                new Uint8Array([
-                    parseInt(val, 10)
-                ]);
+// --------------------------------------------------
+// BLE CONNECTION
+// --------------------------------------------------
 
-            bleWriteQueue =
-                bleWriteQueue.then(async () => {
+async function connectBLE() {
 
-                    if (!targetDataCharacteristic) {
-                        return;
+    const logDisplay =
+        document.getElementById(
+            "connectionLog"
+        );
+
+    logDisplay.innerText =
+        "REQUESTING BLE DEVICE...";
+
+    logDisplay.style.color =
+        "var(--warning)";
+
+    try {
+
+        targetDevice =
+            await navigator.bluetooth.requestDevice({
+                filters: [
+                    {
+                        services: [
+                            HM10_SERVICE_UUID
+                        ]
                     }
+                ],
+                optionalServices: [
+                    HM10_SERVICE_UUID
+                ]
+            });
 
-                    await targetDataCharacteristic
-                        .writeValueWithoutResponse(
-                            headerBuffer
-                        );
+        logDisplay.innerText =
+            "CONNECTING TO GATT LAYER...";
 
-                    await new Promise(resolve =>
-                        setTimeout(resolve, 40)
-                    );
+        const server =
+            await targetDevice.gatt.connect();
 
-                    await targetDataCharacteristic
-                        .writeValueWithoutResponse(
-                            dataBuffer
-                        );
+        logDisplay.innerText =
+            "PARSING HM-10 SERVICE...";
 
-                    await new Promise(resolve =>
-                        setTimeout(resolve, 60)
-                    );
-                });
+        const service =
+            await server.getPrimaryService(
+                HM10_SERVICE_UUID
+            );
 
-            return bleWriteQueue;
-        }
+        logDisplay.innerText =
+            "ACQUIRING RX/TX CHARACTERISTIC...";
 
-        async function transmitModeToken(tokenChar) {
+        targetDataCharacteristic =
+            await service.getCharacteristic(
+                HM10_CHARACTERISTIC_UUID
+            );
+
+        logDisplay.innerText =
+            "INTERFACE STATUS: CONNECTED";
+
+        logDisplay.style.color =
+            "var(--success)";
+
+        webCubeMode = "NONE";
+
+        updateSModeUI();
+
+        targetDevice.addEventListener(
+            "gattserverdisconnected",
+            onDisconnected
+        );
+
+    } catch (error) {
+
+        console.error(error);
+
+        logDisplay.innerText =
+            "CONNECTION FAILED";
+
+        logDisplay.style.color =
+            "var(--danger)";
+
+        targetDataCharacteristic = null;
+
+        webCubeMode = "NONE";
+
+        updateSModeUI();
+
+        alert(
+            "BLE Handshake failed: " +
+            error.message
+        );
+    }
+}
+
+// --------------------------------------------------
+// DISCONNECT
+// --------------------------------------------------
+
+function onDisconnected() {
+
+    const logDisplay =
+        document.getElementById(
+            "connectionLog"
+        );
+
+    // Stop script immediately.
+    scriptPlaybackRunning = false;
+
+    scriptPlaybackToken++;
+
+    targetDataCharacteristic = null;
+
+    webCubeMode = "NONE";
+
+    updateSModeUI();
+
+    logDisplay.innerText =
+        "INTERFACE STATUS: DISCONNECTED";
+
+    logDisplay.style.color =
+        "var(--warning)";
+}
+
+function disconnectBLE() {
+
+    scriptPlaybackRunning = false;
+
+    scriptPlaybackToken++;
+
+    webCubeMode = "NONE";
+
+    updateSModeUI();
+
+    if (
+        targetDevice &&
+        targetDevice.gatt.connected
+    ) {
+        targetDevice.gatt.disconnect();
+    }
+}
+
+// --------------------------------------------------
+// QUEUED BLE WRITE
+// --------------------------------------------------
+//
+// Every write passes through one queue.
+// Script writes also carry a playback token.
+// When mode changes, old script writes are skipped.
+// --------------------------------------------------
+
+function queueBLEWrite(
+    data,
+    playbackToken = null
+) {
+
+    bleWriteQueue =
+        bleWriteQueue.then(async () => {
 
             if (!targetDataCharacteristic) {
+                throw new Error(
+                    "Bluetooth disconnected."
+                );
+            }
+
+            if (
+                playbackToken !== null &&
+                playbackToken !== scriptPlaybackToken
+            ) {
                 return;
             }
 
-            if (
-                tokenChar === 'A' ||
-                tokenChar === 'M' ||
-                tokenChar === 'N' ||
-                tokenChar === 'Q'
-            ) {
-                scriptPlaybackRunning = false;
+            let attempts = 0;
 
-                scriptPlaybackToken++;
-            }
+            while (attempts < 5) {
 
-            if (tokenChar === 'A') {
-                webCubeMode = "A";
-            }
-            else if (tokenChar === 'M') {
-                webCubeMode = "M";
-            }
-            else if (tokenChar === 'Q') {
-                webCubeMode = "A";
-            }
-
-            updateSModeUI();
-
-            const buffer =
-                new TextEncoder().encode(tokenChar);
-
-            bleWriteQueue =
-                bleWriteQueue.then(async () => {
-
-                    if (!targetDataCharacteristic) {
-                        return;
-                    }
-
-                    await targetDataCharacteristic
-                        .writeValueWithoutResponse(
-                            buffer
-                        );
-
-                    await new Promise(resolve =>
-                        setTimeout(resolve, 60)
-                    );
-                });
-
-            return bleWriteQueue;
-        }
-
-        async function enterSMode() {
-
-            if (!targetDataCharacteristic) {
-
-                alert(
-                    "Please connect to Bluetooth HM-10 first!"
-                );
-
-                return;
-            }
-
-            scriptPlaybackRunning = false;
-
-            scriptPlaybackToken++;
-
-            webCubeMode = "S";
-
-            updateSModeUI();
-
-            const sModeCommand =
-                new Uint8Array([
-                    0xFF,
-                    83
-                ]);
-
-            try {
-
-                await queueBLEWrite(sModeCommand);
-
-                const statusDisplay =
-                    document.getElementById(
-                        'connectionLog'
-                    );
-
-                statusDisplay.innerText =
-                    "CONNECTED (S MODE / READY)";
-
-            } catch (error) {
-
-                webCubeMode = "NONE";
-
-                updateSModeUI();
-
-                const statusDisplay =
-                    document.getElementById(
-                        'connectionLog'
-                    );
-
-                statusDisplay.innerText =
-                    "S MODE ENTRY FAILED";
-
-                alert(
-                    "S-Mode entry failed: " +
-                    error.message
-                );
-            }
-        }
-
-        function queueBLEWrite(data) {
-
-            bleWriteQueue =
-                bleWriteQueue.then(async () => {
-
-                    if (!targetDataCharacteristic) {
-
-                        throw new Error(
-                            "Bluetooth disconnected."
-                        );
-                    }
-
-                    let attempts = 0;
-
-                    while (attempts < 5) {
-
-                        try {
-
-                            await targetDataCharacteristic
-                                .writeValueWithoutResponse(
-                                    data
-                                );
-
-                            await new Promise(resolve =>
-                                setTimeout(resolve, 70)
-                            );
-
-                            return;
-
-                        } catch (error) {
-
-                            attempts++;
-
-                            if (
-                                !error.message ||
-                                !error.message
-                                    .toLowerCase()
-                                    .includes(
-                                        "already in progress"
-                                    )
-                            ) {
-                                throw error;
-                            }
-
-                            await new Promise(resolve =>
-                                setTimeout(resolve, 150)
-                            );
-                        }
-                    }
-
-                    throw new Error(
-                        "BLE GATT remained busy after multiple retries."
-                    );
-                });
-
-            return bleWriteQueue;
-        }
-
-        async function sendSingleScriptFrame(frameBytes) {
-
-            let packet =
-                new Uint8Array(66);
-
-            packet[0] = 0xFF;
-
-            packet[1] = 83; // ASCII 'S'
-
-            packet.set(frameBytes, 2);
-
-            const CHUNK_SIZE = 20;
-
-            for (
-                let i = 0;
-                i < packet.length;
-                i += CHUNK_SIZE
-            ) {
-
-                if (!scriptPlaybackRunning) {
+                if (
+                    playbackToken !== null &&
+                    playbackToken !== scriptPlaybackToken
+                ) {
                     return;
                 }
 
-                const chunk =
-                    packet.slice(
-                        i,
-                        Math.min(
-                            i + CHUNK_SIZE,
-                            packet.length
-                        )
+                try {
+
+                    await targetDataCharacteristic
+                        .writeValueWithoutResponse(
+                            data
+                        );
+
+                    await new Promise(
+                        resolve =>
+                            setTimeout(resolve, 70)
                     );
 
-                await queueBLEWrite(chunk);
-            }
-        }
+                    return;
 
-        async function executeSModeTransferEngine() {
+                } catch (error) {
 
-            if (!targetDataCharacteristic) {
+                    attempts++;
 
-                alert(
-                    "Please connect to Bluetooth HM-10 first!"
-                );
-
-                return;
-            }
-
-            if (webCubeMode !== "S") {
-
-                alert(
-                    "Enter S MODE first."
-                );
-
-                return;
-            }
-
-            scriptPlaybackRunning = false;
-
-            scriptPlaybackToken++;
-
-            const myToken =
-                scriptPlaybackToken;
-
-            await bleWriteQueue;
-
-            parseAndCompileScript();
-
-            if (scriptFrames.length === 0) {
-
-                alert(
-                    "No valid frames found."
-                );
-
-                return;
-            }
-
-            scriptPlaybackRunning = true;
-
-            const statusDisplay =
-                document.getElementById(
-                    'connectionLog'
-                );
-
-            statusDisplay.innerText =
-                "DRAWING " +
-                scriptFrames.length +
-                " FRAME(S)...";
-
-            try {
-
-                while (
-                    scriptPlaybackRunning &&
-                    myToken === scriptPlaybackToken &&
-                    webCubeMode === "S"
-                ) {
-
-                    for (
-                        let frameIndex = 0;
-                        frameIndex < scriptFrames.length;
-                        frameIndex++
+                    if (
+                        !error.message ||
+                        !error.message
+                            .toLowerCase()
+                            .includes(
+                                "already in progress"
+                            )
                     ) {
 
-                        if (
-                            !scriptPlaybackRunning ||
-                            myToken !== scriptPlaybackToken ||
-                            webCubeMode !== "S"
-                        ) {
-                            break;
-                        }
-
-                        await sendSingleScriptFrame(
-                            scriptFrames[frameIndex]
-                        );
-
-                        if (
-                            !scriptPlaybackRunning ||
-                            myToken !== scriptPlaybackToken ||
-                            webCubeMode !== "S"
-                        ) {
-                            break;
-                        }
-
-                        await new Promise(resolve =>
-                            setTimeout(resolve, 250)
-                        );
+                        throw error;
                     }
+
+                    await new Promise(
+                        resolve =>
+                            setTimeout(resolve, 150)
+                    );
                 }
+            }
 
-            } catch (error) {
+            throw new Error(
+                "BLE GATT remained busy after multiple retries."
+            );
+        });
 
-                scriptPlaybackRunning = false;
+    return bleWriteQueue;
+}
 
-                statusDisplay.innerText =
-                    "TRANSMISSION ERROR";
+// --------------------------------------------------
+// BRIGHTNESS
+// --------------------------------------------------
 
-                alert(
-                    "S-Mode transmission failed: " +
-                    error.message
-                );
+async function updateBrightness(val) {
 
+    document.getElementById(
+        "brightnessVal"
+    ).innerText = val;
+
+    const headerBuffer =
+        new TextEncoder().encode("B");
+
+    const dataBuffer =
+        new Uint8Array([
+            parseInt(val, 10)
+        ]);
+
+    bleWriteQueue =
+        bleWriteQueue.then(async () => {
+
+            if (!targetDataCharacteristic) {
                 return;
             }
 
-            if (
-                targetDataCharacteristic &&
-                webCubeMode === "S"
+            await targetDataCharacteristic
+                .writeValueWithoutResponse(
+                    headerBuffer
+                );
+
+            await new Promise(
+                resolve =>
+                    setTimeout(resolve, 40)
+            );
+
+            await targetDataCharacteristic
+                .writeValueWithoutResponse(
+                    dataBuffer
+                );
+
+            await new Promise(
+                resolve =>
+                    setTimeout(resolve, 60)
+            );
+        });
+
+    return bleWriteQueue;
+}
+
+// --------------------------------------------------
+// AUTO / MANUAL / NEXT
+// --------------------------------------------------
+
+async function transmitModeToken(tokenChar) {
+
+    if (!targetDataCharacteristic) {
+        return;
+    }
+
+    if (
+        tokenChar === "A" ||
+        tokenChar === "M" ||
+        tokenChar === "N" ||
+        tokenChar === "Q"
+    ) {
+
+        scriptPlaybackRunning = false;
+        scriptPlaybackToken++;
+    }
+
+    if (tokenChar === "A") {
+
+        webCubeMode = "A";
+    }
+
+    else if (tokenChar === "M") {
+
+        webCubeMode = "M";
+    }
+
+    else if (tokenChar === "Q") {
+
+        webCubeMode = "A";
+    }
+
+    updateSModeUI();
+
+    const buffer =
+        new TextEncoder().encode(
+            tokenChar
+        );
+
+    return queueBLEWrite(buffer);
+}
+
+// --------------------------------------------------
+// ENTER S MODE
+// --------------------------------------------------
+//
+// This is deliberately a separate S command.
+// It is NOT the same as a frame.
+// Arduino receives 'S' and clears the cube once.
+// --------------------------------------------------
+
+async function enterSMode() {
+
+    if (!targetDataCharacteristic) {
+
+        alert(
+            "Please connect to Bluetooth HM-10 first!"
+        );
+
+        return;
+    }
+
+    scriptPlaybackRunning = false;
+
+    scriptPlaybackToken++;
+
+    webCubeMode = "S";
+
+    updateSModeUI();
+
+    const sModeCommand =
+        new TextEncoder().encode("S");
+
+    const statusDisplay =
+        document.getElementById(
+            "connectionLog"
+        );
+
+    try {
+
+        await queueBLEWrite(
+            sModeCommand
+        );
+
+        statusDisplay.innerText =
+            "CONNECTED (S MODE / READY)";
+
+        statusDisplay.style.color =
+            "#8b5cf6";
+
+    } catch (error) {
+
+        webCubeMode = "NONE";
+
+        updateSModeUI();
+
+        statusDisplay.innerText =
+            "S MODE ENTRY FAILED";
+
+        alert(
+            "S-Mode entry failed: " +
+            error.message
+        );
+    }
+}
+
+// --------------------------------------------------
+// SEND ONE 64-BYTE FRAME
+// --------------------------------------------------
+
+async function sendSingleScriptFrame(
+    frameBytes,
+    playbackToken
+) {
+
+    let packet =
+        new Uint8Array(66);
+
+    packet[0] = 0xFF;
+    packet[1] = 83; // ASCII 'S'
+
+    packet.set(
+        frameBytes,
+        2
+    );
+
+    const CHUNK_SIZE = 20;
+
+    for (
+        let i = 0;
+        i < packet.length;
+        i += CHUNK_SIZE
+    ) {
+
+        if (
+            !scriptPlaybackRunning ||
+            playbackToken !== scriptPlaybackToken ||
+            webCubeMode !== "S"
+        ) {
+            return;
+        }
+
+        const chunk =
+            packet.slice(
+                i,
+                Math.min(
+                    i + CHUNK_SIZE,
+                    packet.length
+                )
+            );
+
+        await queueBLEWrite(
+            chunk,
+            playbackToken
+        );
+    }
+}
+
+// --------------------------------------------------
+// SCRIPT PLAYBACK
+// --------------------------------------------------
+
+async function executeSModeTransferEngine() {
+
+    if (!targetDataCharacteristic) {
+
+        alert(
+            "Please connect to Bluetooth HM-10 first!"
+        );
+
+        return;
+    }
+
+    // Run button works ONLY in S mode.
+    if (webCubeMode !== "S") {
+
+        alert(
+            "Enter S MODE first."
+        );
+
+        return;
+    }
+
+    scriptPlaybackRunning = false;
+
+    scriptPlaybackToken++;
+
+    const myToken =
+        scriptPlaybackToken;
+
+    await bleWriteQueue;
+
+    if (
+        myToken !== scriptPlaybackToken ||
+        webCubeMode !== "S"
+    ) {
+        return;
+    }
+
+    parseAndCompileScript();
+
+    if (scriptFrames.length === 0) {
+
+        alert(
+            "No valid frames found."
+        );
+
+        return;
+    }
+
+    scriptPlaybackRunning = true;
+
+    const statusDisplay =
+        document.getElementById(
+            "connectionLog"
+        );
+
+    statusDisplay.innerText =
+        "DRAWING " +
+        scriptFrames.length +
+        " FRAME(S)...";
+
+    statusDisplay.style.color =
+        "#8b5cf6";
+
+    try {
+
+        while (
+            scriptPlaybackRunning &&
+            myToken === scriptPlaybackToken &&
+            webCubeMode === "S"
+        ) {
+
+            for (
+                let frameIndex = 0;
+                frameIndex < scriptFrames.length;
+                frameIndex++
             ) {
 
-                statusDisplay.innerText =
-                    "CONNECTED (S MODE)";
+                if (
+                    !scriptPlaybackRunning ||
+                    myToken !== scriptPlaybackToken ||
+                    webCubeMode !== "S"
+                ) {
+                    break;
+                }
+
+                await sendSingleScriptFrame(
+                    scriptFrames[frameIndex],
+                    myToken
+                );
+
+                if (
+                    !scriptPlaybackRunning ||
+                    myToken !== scriptPlaybackToken ||
+                    webCubeMode !== "S"
+                ) {
+                    break;
+                }
+
+                await new Promise(
+                    resolve =>
+                        setTimeout(resolve, 250)
+                );
             }
         }
-    </script>
+
+    } catch (error) {
+
+        scriptPlaybackRunning = false;
+
+        statusDisplay.innerText =
+            "TRANSMISSION ERROR";
+
+        alert(
+            "S-Mode transmission failed: " +
+            error.message
+        );
+
+        return;
+    }
+
+    if (
+        targetDataCharacteristic &&
+        webCubeMode === "S" &&
+        myToken === scriptPlaybackToken
+    ) {
+
+        statusDisplay.innerText =
+            "CONNECTED (S MODE)";
+    }
+}
+
+</script>
+
 </body>
 </html>
