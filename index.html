@@ -2,404 +2,484 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>8x8x8 LED Cube Console - Script Engine</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #E0E0E0; padding: 20px; margin: 0; }
-        .dashboard-container { max-width: 650px; margin: 10px auto; background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        h2, h3 { margin-top: 0; color: #FFFFFF; font-weight: 600; border-bottom: 1px solid #2D2D2D; padding-bottom: 10px; }
-        .status-box { background: #262626; padding: 12px 18px; border-radius: 6px; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
-        .status-disconnected { color: #FF5252; }
-        .status-connected { color: #00E676; }
-        .control-grid { display: flex; flex-direction: column; gap: 12px; }
-        .btn { width: 100%; background: #2979FF; color: #FFFFFF; border: none; padding: 12px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        .btn:hover { background: #2962FF; }
-        .btn-disconnect { background: #333333; border: 1px solid #444; }
-        .btn-disconnect:hover { background: #D50000; }
-        .btn-action { background: #00E676; color: #121212; }
-        .btn-s-mode { background: #AA00FF; color: #FFFFFF; font-size: 16px; padding: 15px; border: 2px solid #D500F9; }
-        .btn-s-mode:hover { background: #8E00C7; }
-        .slider-block { background: #262626; border: 1px solid #333; padding: 12px; border-radius: 6px; }
-        textarea { width: 100%; height: 120px; background: #121212; color: #00E676; border: 1px solid #333; border-radius: 6px; padding: 10px; font-family: monospace; box-sizing: border-box; }
-        input[type=file] { margin-bottom: 10px; color: #CCC; }
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: #151f32;
+            --text-color: #f1f5f9;
+            --text-muted: #94a3b8;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --success-hover: #059669;
+            --warning: #f59e0b;
+            --warning-hover: #d97706;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .console-container {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 600px;
+            padding: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            letter-spacing: 1px;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #fff;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+        }
+
+        h3 {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-top: 24px;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .status-panel {
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--warning);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-align: center;
+        }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-success:hover { background-color: var(--success-hover); }
+
+        .btn-warning { background-color: var(--warning); color: white; }
+        .btn-warning:hover { background-color: var(--warning-hover); }
+
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+
+        .btn-s-mode {
+            background-color: #8b5cf6;
+            color: white;
+            margin-top: 10px;
+        }
+        .btn-s-mode:hover {
+            background-color: #7c3aed;
+        }
+
+        .control-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .engine-panel {
+            border-top: 1px dashed var(--border);
+            margin-top: 20px;
+            padding-top: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: #51ff00;
+            font-family: monospace;
+            padding: 10px;
+            resize: vertical;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+        }
+
+        .file-input-wrapper {
+            margin-bottom: 12px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            display: block;
+            background-color: #334155;
+            color: var(--text-color);
+            padding: 10px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
+        }
+
+        .file-label:hover {
+            background-color: #475569;
+        }
+
+        .range-container {
+            margin-top: 16px;
+            background-color: rgba(0, 0, 0, 0.1);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .range-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--primary);
+        }
     </style>
 </head>
 <body>
-<div class="dashboard-container">
-    <h2>8x8x8 CUBE ADVANCED ENGINE</h2>
-<div class="status-box">
-    <span>INTERFACE STATUS:</span>
-    <span id="connectionLog" class="status-disconnected">DISCONNECTED</span>
-</div>
-<div class="control-grid">
-    <button id="connectBtn" class="btn" onclick="triggerBLELinkSession()">Pair HM-10 BLE Module</button>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <button class="btn btn-action" onclick="transmitModeToken('A')">Auto Mode ('A')</button>
-        <button class="btn btn-action" onclick="transmitModeToken('M')">Manual Mode ('M')</button>
-    </div>
-    <button class="btn" style="background:#FFD600; color:#121212;" onclick="transmitModeToken('N')">Next Pattern Step ('N')</button>
-    <h3>CUSTOM .TXT CODE ENGINE (MODE 'S')</h3>
-    <p style="font-size: 12px; color: #888; margin: 0;">
-        Upload a .txt script file or write XYZ code. Script automatically saves to local browser storage.
-    </p>
-    
-    <input type="file" id="txtFileInput" accept=".txt" onchange="loadTxtFile(this)">
-    <textarea id="scriptEditor" placeholder="Enter XYZ commands like set(0,0,0), FRAME_START/FRAME_END, or 64 hex bytes..."></textarea>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <button class="btn" style="background:#444;" onclick="saveToLocalStorage()">Save Script to Storage</button>
-        <button class="btn" style="background:#00B0FF;" onclick="parseAndCompileScript()">Compile Code Engine</button>
-    </div>
-    <button class="btn btn-s-mode" onclick="executeSModeTransferEngine()">
-        RUN 'S' MODE ENGINE
-    </button>
-    <div class="slider-block">
-        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <span>BRIGHTNESS CONTROL:</span>
-            <span id="sliderValLabel">5</span>
+
+    <div class="console-container">
+        <h2>8x8x8 CUBE ADVANCED ENGINE</h2>
+
+        <div class="status-panel" id="connectionLog">
+            INTERFACE STATUS: DISCONNECTED
         </div>
-        <input type="range" id="brightnessInputSlider" min="2" max="8" value="5" step="1" oninput="executeBrightnessShift(this.value)">
+
+        <button class="btn btn-primary" onclick="connectBLE()">
+            Pair HM-10 BLE Module
+        </button>
+
+        <div class="control-group">
+            <button class="btn btn-success" onclick="transmitModeToken('A')">
+                Auto Mode ('A')
+            </button>
+            <button class="btn btn-warning" onclick="transmitModeToken('M')">
+                Manual Mode ('M')
+            </button>
+        </div>
+
+        <button class="btn btn-primary" onclick="transmitModeToken('N')">
+            Next Pattern Step ('N')
+        </button>
+
+        <div class="engine-panel">
+            <h3>CUSTOM .TXT CODE ENGINE (MODE 'S')</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
+                Upload a .txt script file or write XYZ code. Script automatically saves to local browser storage.
+            </p>
+
+            <div class="file-input-wrapper">
+                <label class="file-label" for="txtFileInput" id="fileInputLabel">
+                    Choose Script File (.txt)
+                </label>
+                <input type="file" id="txtFileInput" accept=".txt" onchange="handleFileLoad(event)">
+            </div>
+
+            <textarea id="scriptIDE" placeholder="// Enter layer hex codes or commands here...&#10;// Example:&#10;// B10000001... (64 hex characters)"></textarea>
+
+            <div class="control-group">
+                <button class="btn btn-primary" style="background-color: #475569;" onclick="saveToStorage()">
+                    Save Script to Storage
+                </button>
+                <button class="btn btn-primary" style="background-color: #475569;" onclick="parseAndCompileScript()">
+                    Compile Code Engine
+                </button>
+            </div>
+
+            <button class="btn btn-s-mode" onclick="executeSModeTransferEngine()">
+                DRAW / RUN CUSTOM SCRIPT
+            </button>
+        </div>
+
+        <div class="range-container">
+            <div class="range-label">
+                <span>BRIGHTNESS CONTROL:</span>
+                <span id="brightnessVal">5</span>
+            </div>
+            <input type="range" id="brightnessRange" min="1" max="10" value="5" oninput="updateBrightness(this.value)">
+        </div>
+
+        <button class="btn btn-danger" style="margin-top: 20px; margin-bottom: 0;" onclick="disconnectBLE()">
+            Disconnect Session
+        </button>
     </div>
-    <button id="disconnectBtn" class="btn btn-disconnect" onclick="terminateConnectionSequence()" style="display:none;">
-        Disconnect Session
-    </button>
-</div>
-</div>
-<script>
-    const HM10_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
-    const HM10_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb';
-    let physicalTargetDevice = null;
-    let targetDataCharacteristic = null;
-    // Single-frame compatibility buffer
-    let compiled64ByteArray = new Uint8Array(64);
-    // Multi-frame script storage
-    let scriptFrames = [];
-    // Stops an already-running custom animation
-    let scriptPlaybackRunning = false;
-    window.onload = function() {
-        const savedScript = localStorage.getItem("cube_txt_script");
-        if (savedScript) {
-            document.getElementById("scriptEditor").value = savedScript;
-            parseAndCompileScript();
-        } else {
-            document.getElementById("scriptEditor").value =
-                "// Sample Script\nset(0,0,0)\nset(7,7,7)\nset(3,3,3)";
-            parseAndCompileScript();
-        }
-    };
-    // ============================================================
-    // BLUETOOTH CONNECTION
-    // ============================================================
-    async function triggerBLELinkSession() {
-        const statusDisplay = document.getElementById('connectionLog');
-        try {
-            statusDisplay.innerText = "SEARCHING...";
-            physicalTargetDevice = await navigator.bluetooth.requestDevice({
-                filters: [{ services: [HM10_SERVICE_UUID] }]
-            });
-            const targetGattServer = await physicalTargetDevice.gatt.connect();
-            const targetService =
-                await targetGattServer.getPrimaryService(HM10_SERVICE_UUID);
-            targetDataCharacteristic =
-                await targetService.getCharacteristic(HM10_CHAR_UUID);
-            statusDisplay.innerText = "CONNECTED";
-            statusDisplay.className = "status-connected";
-            document.getElementById('connectBtn').style.display = "none";
-            document.getElementById('disconnectBtn').style.display = "block";
-            physicalTargetDevice.addEventListener(
-                'gattserverdisconnected',
-                cleanSessionStateWipe
-            );
-        } catch(error) {
-            statusDisplay.innerText = "DISCONNECTED";
-            statusDisplay.className = "status-disconnected";
-            alert("Connection Failed: " + error.message);
-        }
-    }
-    // ============================================================
-    // EXISTING BLUETOOTH COMMANDS — UNCHANGED
-    // ============================================================
-    async function transmitModeToken(tokenChar) {
-        if (!targetDataCharacteristic) return;
-        const buffer = new TextEncoder().encode(tokenChar);
-        await targetDataCharacteristic.writeValueWithoutResponse(buffer);
-    }
-    async function executeBrightnessShift(val) {
-        document.getElementById('sliderValLabel').innerText = val;
-        if (!targetDataCharacteristic) return;
-        const dataPayload = new Uint8Array([
-            66,
-            parseInt(val)
-        ]);
-        await targetDataCharacteristic.writeValueWithoutResponse(dataPayload);
-    }
-    // ============================================================
-    // FILE HANDLING
-    // ============================================================
-    function loadTxtFile(input) {
-        let file = input.files[0];
-        if (!file) return;
-        let reader = new FileReader();
-        reader.onload = function(e) {
-            document.getElementById("scriptEditor").value = e.target.result;
-            saveToLocalStorage();
-            parseAndCompileScript();
-        };
-        reader.readAsText(file);
-    }
-    function saveToLocalStorage() {
-        const script =
-            document.getElementById("scriptEditor").value;
-        localStorage.setItem("cube_txt_script", script);
-    }
-    // ============================================================
-    // SCRIPT PARSER
-    //
-    // Supports:
-    //
-    // 1. Normal single image:
-    //
-    //    set(2,1,4)
-    //    set(3,1,4)
-    //
-    // 2. Multi-frame animation:
-    //
-    //    FRAME_START
-    //    set(...)
-    //    set(...)
-    //    FRAME_END
-    //
-    // ============================================================
-    function parseAndCompileScript() {
-        saveToLocalStorage();
-        const text =
-            document.getElementById("scriptEditor").value;
-        // Reset everything
-        compiled64ByteArray.fill(0);
-        scriptFrames = [];
-        let currentFrame = null;
-        let foundFrameMarkers = false;
-        const lines = text.split(/\r?\n/);
-        lines.forEach(rawLine => {
-            let line = rawLine.trim();
-            // Ignore comments and empty lines
-            if (
-                line === "" ||
-                line.startsWith("//")
-            ) {
-                return;
-            }
-            // ----------------------------------------------------
-            // FRAME START
-            // ----------------------------------------------------
-            if (
-                line.toUpperCase() === "FRAME_START"
-            ) {
-                foundFrameMarkers = true;
-                currentFrame = new Uint8Array(64);
-                return;
-            }
-            // ----------------------------------------------------
-            // FRAME END
-            // ----------------------------------------------------
-            if (
-                line.toUpperCase() === "FRAME_END"
-            ) {
-                if (currentFrame !== null) {
-                    scriptFrames.push(
-                        new Uint8Array(currentFrame)
-                    );
-                    currentFrame = null;
-                }
-                return;
-            }
-            // ----------------------------------------------------
-            // SET(X,Y,Z)
-            // ----------------------------------------------------
-            let match = line.match(
-                /set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i
-            );
-            if (match) {
-                let x = parseInt(match[1]);
-                let y = parseInt(match[2]);
-                let z = parseInt(match[3]);
-                if (
-                    x >= 0 && x < 8 &&
-                    y >= 0 && y < 8 &&
-                    z >= 0 && z < 8
-                ) {
-                    let index = z * 8 + y;
-                    // If inside FRAME_START/FRAME_END,
-                    // write into that frame.
-                    if (currentFrame !== null) {
-                        currentFrame[index] |=
-                            (1 << x);
-                    } else {
-                        // Otherwise write to the normal
-                        // single-image buffer.
-                        compiled64ByteArray[index] |=
-                            (1 << x);
-                    }
-                }
+
+    <script>
+        // Web BLE profile handles
+        let targetDevice = null;
+        let targetDataCharacteristic = null;
+
+        // Custom S-Mode engine targets
+        const HM10_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
+        const HM10_CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
+
+        // Runtime states & concurrency hooks
+        let scriptFrames = [];
+        let scriptPlaybackRunning = false;
+        let scriptPlaybackToken = 0;
+        let bleWriteQueue = Promise.resolve();
+
+        // Safe-load text buffer cache
+        window.addEventListener('DOMContentLoaded', () => {
+            const cachedScript = localStorage.getItem('cube_cached_script');
+            if (cachedScript) {
+                document.getElementById('scriptIDE').value = cachedScript;
             }
         });
-        // --------------------------------------------------------
-        // IF FRAME MARKERS WERE USED
-        // --------------------------------------------------------
-        if (foundFrameMarkers) {
-            // If the last frame forgot FRAME_END,
-            // still preserve it.
-            if (currentFrame !== null) {
-                scriptFrames.push(
-                    new Uint8Array(currentFrame)
-                );
-            }
-            // Make sure there is at least one frame.
-            if (scriptFrames.length === 0) {
-                scriptFrames.push(
-                    new Uint8Array(64)
-                );
-            }
-        } else {
-            // Normal old-style script:
-            // one static 64-byte frame.
-            scriptFrames.push(
-                new Uint8Array(compiled64ByteArray)
-            );
+
+        function saveToStorage() {
+            const currentCode = document.getElementById('scriptIDE').value;
+            localStorage.setItem('cube_cached_script', currentCode);
+            alert("Script compiled and committed to browser sandbox.");
         }
-    }
-    // ============================================================
-    // SEND ONE 64-BYTE FRAME
-    //
-    // Logical packet:
-    //
-    // [0xFF] ['S'] [64 bytes]
-    //
-    // Total = 66 bytes
-    //
-    // BLE transport:
-    //
-    // 20 + 20 + 20 + 6
-    //
-    // The 64-byte cube frame itself is NOT changed.
-    // ============================================================
-    async function sendSingleScriptFrame(frameBytes) {
-        let packet = new Uint8Array(66);
-        packet[0] = 0xFF;
-        packet[1] = 83; // ASCII 'S'
-        packet.set(frameBytes, 2);
-        const CHUNK_SIZE = 20;
-        for (
-            let i = 0;
-            i < packet.length;
-            i += CHUNK_SIZE
-        ) {
-            if (!targetDataCharacteristic) {
-                throw new Error("Bluetooth disconnected.");
-            }
-            const chunk =
-                packet.slice(
-                    i,
-                    Math.min(i + CHUNK_SIZE, packet.length)
-                );
-            await targetDataCharacteristic
-                .writeValueWithoutResponse(chunk);
-            // Small gap between HM-10 BLE writes.
-            // This does NOT change the 64-byte frame format.
-            await new Promise(
-                resolve => setTimeout(resolve, 80)
-            );
+
+        function handleFileLoad(event) {
+            const input = event.target;
+            if (!input.files || input.files.length === 0) return;
+            
+            const file = input.files[0];
+            document.getElementById('fileInputLabel').innerText = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = function() {
+                document.getElementById('scriptIDE').value = reader.result;
+                localStorage.setItem('cube_cached_script', reader.result);
+            };
+            reader.readAsText(file);
         }
-    }
-    // ============================================================
-    // S-MODE MULTI-FRAME PLAYBACK
-    // ============================================================
-    async function executeSModeTransferEngine() {
-        if (!targetDataCharacteristic) {
-            alert(
-                "Please connect to Bluetooth HM-10 first!"
-            );
-            return;
-        }
-        // Stop previous playback
-        scriptPlaybackRunning = false;
-        // Give any previous loop a moment to exit
-        await new Promise(
-            resolve => setTimeout(resolve, 20)
-        );
-        parseAndCompileScript();
-        if (scriptFrames.length === 0) {
-            alert("No valid script frames found.");
-            return;
-        }
-        const statusDisplay =
-            document.getElementById('connectionLog');
-        scriptPlaybackRunning = true;
-        statusDisplay.innerText =
-            "RUNNING " +
-            scriptFrames.length +
-            " FRAME(S)...";
-        try {
-            while (scriptPlaybackRunning) {
-                for (
-                    let frameIndex = 0;
-                    frameIndex < scriptFrames.length;
-                    frameIndex++
-                ) {
-                    if (!scriptPlaybackRunning) {
-                        break;
+
+        // Simplistic parser looking for 64-byte frame patterns
+        function parseAndCompileScript() {
+            scriptFrames = [];
+            const rawText = document.getElementById('scriptIDE').value;
+            const lines = rawText.split('\n');
+
+            for (let line of lines) {
+                line = line.trim();
+                // Strip comments
+                if (line.startsWith('//') || line.startsWith('#')) continue;
+
+                // Clean input line of non-hex if formatting is used
+                const hexClean = line.replace(/[^0-9a-fA-F]/g, '');
+                
+                // Check if frame has correct data depth (64 bytes = 128 hex chars, or raw binary conversions)
+                if (hexClean.length >= 128) {
+                    let frameBytes = new Uint8Array(64);
+                    for (let i = 0; i < 64; i++) {
+                        frameBytes[i] = parseInt(hexClean.substr(i * 2, 2), 16) || 0;
                     }
-                    // Send complete 64-byte logical frame
-                    await sendSingleScriptFrame(
-                        scriptFrames[frameIndex]
-                    );
-                    if (!scriptPlaybackRunning) {
-                        break;
+                    scriptFrames.push(frameBytes);
+                } else if (line.length >= 64) {
+                    // Try parsing as raw individual characters/states
+                    let frameBytes = new Uint8Array(64);
+                    for(let i = 0; i < 64; i++) {
+                        frameBytes[i] = line.charCodeAt(i) || 0;
                     }
-                    // Time that each frame remains visible.
-                    // 250 ms = 4 frames/sec.
-                    await new Promise(
-                        resolve => setTimeout(resolve, 250)
-                    );
+                    scriptFrames.push(frameBytes);
                 }
             }
-        } catch(error) {
+            console.log("Compiled frames: ", scriptFrames.length);
+        }
+
+        async function connectBLE() {
+            const logDisplay = document.getElementById('connectionLog');
+            logDisplay.innerText = "REQUESTING BLE DEVICE...";
+            logDisplay.style.color = "var(--warning)";
+            try {
+                targetDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [HM10_SERVICE_UUID] }],
+                    optionalServices: [HM10_SERVICE_UUID]
+                });
+                logDisplay.innerText = "CONNECTING TO GATT LAYER...";
+                const server = await targetDevice.gatt.connect();
+                logDisplay.innerText = "PARSING HM-10 SERVICE...";
+                const service = await server.getPrimaryService(HM10_SERVICE_UUID);
+                logDisplay.innerText = "ACQUIRING RX/TX CHARACTERISTIC...";
+                targetDataCharacteristic = await service.getCharacteristic(HM10_CHARACTERISTIC_UUID);
+                logDisplay.innerText = "INTERFACE STATUS: CONNECTED";
+                logDisplay.style.color = "var(--success)";
+                targetDevice.addEventListener('gattserverdisconnected', onDisconnected);
+            } catch (error) {
+                console.error(error);
+                logDisplay.innerText = "CONNECTION FAILED";
+                logDisplay.style.color = "var(--danger)";
+                alert("BLE Handshake failed: " + error.message);
+            }
+        }
+
+        function onDisconnected() {
+            const logDisplay = document.getElementById('connectionLog');
+            logDisplay.innerText = "INTERFACE STATUS: DISCONNECTED";
+            logDisplay.style.color = "var(--warning)";
+            targetDataCharacteristic = null;
             scriptPlaybackRunning = false;
-            statusDisplay.innerText =
-                "TRANSMISSION ERROR";
-            alert(
-                "S-Mode transmission failed: " +
-                error.message
-            );
-            return;
         }
-        statusDisplay.innerText =
-            "CONNECTED (MODE 'S' RUNNING)";
-    }
-    // ============================================================
-    // DISCONNECT
-    // ============================================================
-    async function terminateConnectionSequence() {
-        scriptPlaybackRunning = false;
-        if (!physicalTargetDevice) return;
-        if (physicalTargetDevice.gatt.connected) {
-            await transmitModeToken('Q');
-            await physicalTargetDevice.gatt.disconnect();
+
+        function disconnectBLE() {
+            if (targetDevice && targetDevice.gatt.connected) {
+                targetDevice.gatt.disconnect();
+            }
         }
-    }
-    function cleanSessionStateWipe() {
-        scriptPlaybackRunning = false;
-        document.getElementById('connectionLog').innerText =
-            "DISCONNECTED";
-        document.getElementById('connectionLog').className =
-            "status-disconnected";
-        document.getElementById('connectBtn').style.display =
-            "block";
-        document.getElementById('disconnectBtn').style.display =
-            "none";
-        targetDataCharacteristic = null;
-        physicalTargetDevice = null;
-    }
-</script>
+
+        async function updateBrightness(val) {
+            document.getElementById('brightnessVal').innerText = val;
+            const brightnessToken = String(val === "10" ? "9" : val);
+            await transmitModeToken(brightnessToken);
+        }
+
+        async function transmitModeToken(tokenChar) {
+            if (!targetDataCharacteristic) return;
+            
+            // Stop custom S-mode animation when changing to A/M/N/Q
+            if (tokenChar === 'A' || tokenChar === 'M' || tokenChar === 'N' || tokenChar === 'Q') {
+                scriptPlaybackRunning = false;
+                scriptPlaybackToken++;
+            }
+            
+            const buffer = new TextEncoder().encode(tokenChar);
+            bleWriteQueue = bleWriteQueue.then(async () => {
+                if (!targetDataCharacteristic) return;
+                await targetDataCharacteristic.writeValueWithoutResponse(buffer);
+                await new Promise(resolve => setTimeout(resolve, 60));
+            });
+            return bleWriteQueue;
+        }
+
+        // Serialized BLE Write to prevent GATT busy errors
+        function queueBLEWrite(data) {
+            bleWriteQueue = bleWriteQueue.then(async () => {
+                if (!targetDataCharacteristic) {
+                    throw new Error("Bluetooth disconnected.");
+                }
+                let attempts = 0;
+                while (attempts < 5) {
+                    try {
+                        await targetDataCharacteristic.writeValueWithoutResponse(data);
+                        await new Promise(resolve => setTimeout(resolve, 70));
+                        return;
+                    } catch (error) {
+                        attempts++;
+                        if (!error.message || !error.message.toLowerCase().includes("already in progress")) {
+                            throw error;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 150));
+                    }
+                }
+                throw new Error("BLE GATT remained busy after multiple retries.");
+            });
+            return bleWriteQueue;
+        }
+
+        // Send one 64-byte frame
+        async function sendSingleScriptFrame(frameBytes) {
+            let packet = new Uint8Array(66);
+            packet[0] = 0xFF;
+            packet[1] = 83; // ASCII S
+            packet.set(frameBytes, 2);
+            
+            const CHUNK_SIZE = 20;
+            for (let i = 0; i < packet.length; i += CHUNK_SIZE) {
+                if (!scriptPlaybackRunning) return;
+                const chunk = packet.slice(i, Math.min(i + CHUNK_SIZE, packet.length));
+                await queueBLEWrite(chunk);
+            }
+        }
+
+        // Dedicated DRAW / S-Mode Engine
+        async function executeSModeTransferEngine() {
+            if (!targetDataCharacteristic) {
+                alert("Please connect to Bluetooth HM-10 first!");
+                return;
+            }
+            
+            scriptPlaybackRunning = false;
+            scriptPlaybackToken++;
+            const myToken = scriptPlaybackToken;
+            
+            await bleWriteQueue;
+            parseAndCompileScript();
+            
+            if (scriptFrames.length === 0) {
+                alert("No valid frames found.");
+                return;
+            }
+            
+            scriptPlaybackRunning = true;
+            const statusDisplay = document.getElementById('connectionLog');
+            statusDisplay.innerText = "DRAWING " + scriptFrames.length + " FRAME(S)...";
+            
+            try {
+                while (scriptPlaybackRunning && myToken === scriptPlaybackToken) {
+                    for (let frameIndex = 0; frameIndex < scriptFrames.length; frameIndex++) {
+                        if (!scriptPlaybackRunning || myToken !== scriptPlaybackToken) break;
+                        
+                        await sendSingleScriptFrame(scriptFrames[frameIndex]);
+                        
+                        if (!scriptPlaybackRunning || myToken !== scriptPlaybackToken) break;
+                        
+                        await new Promise(resolve => setTimeout(resolve, 250));
+                    }
+                }
+            } catch (error) {
+                scriptPlaybackRunning = false;
+                statusDisplay.innerText = "TRANSMISSION ERROR";
+                alert("S-Mode transmission failed: " + error.message);
+                return;
+            }
+            
+            if (targetDataCharacteristic) {
+                statusDisplay.innerText = "CONNECTED (DRAW MODE)";
+            }
+        }
+    </script>
 </body>
 </html>
