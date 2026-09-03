@@ -1,11 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>8x8x8 LED Cube Console - Script Engine</title>
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        8x8x8 LED Cube Console - Script Engine
+    </title>
 
     <style>
+
         :root {
             --bg-color: #0b0f19;
             --panel-bg: #151f32;
@@ -26,282 +36,470 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                Roboto, Helvetica, Arial, sans-serif;
+
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Roboto,
+                Helvetica,
+                Arial,
+                sans-serif;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
+
+            background-color:
+                var(--bg-color);
+
+            color:
+                var(--text-color);
+
             padding: 20px;
+
             display: flex;
+
             justify-content: center;
+
             align-items: center;
+
             min-height: 100vh;
         }
 
         .console-container {
-            background-color: var(--panel-bg);
-            border: 1px solid var(--border);
+
+            background-color:
+                var(--panel-bg);
+
+            border:
+                1px solid var(--border);
+
             border-radius: 12px;
+
             width: 100%;
+
             max-width: 600px;
+
             padding: 24px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+
+            box-shadow:
+                0 10px 25px -5px
+                rgba(0, 0, 0, 0.3);
         }
 
         h2 {
+
             font-size: 1.5rem;
+
             letter-spacing: 1px;
+
             text-align: center;
+
             margin-bottom: 20px;
+
             color: #fff;
-            border-bottom: 2px solid var(--border);
+
+            border-bottom:
+                2px solid var(--border);
+
             padding-bottom: 12px;
         }
 
         h3 {
+
             font-size: 1rem;
-            color: var(--text-muted);
+
+            color:
+                var(--text-muted);
+
             margin-top: 24px;
+
             margin-bottom: 12px;
+
             letter-spacing: 0.5px;
         }
 
         .status-panel {
-            background-color: rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--border);
+
+            background-color:
+                rgba(0, 0, 0, 0.2);
+
+            border:
+                1px solid var(--border);
+
             padding: 12px;
+
             border-radius: 6px;
+
             font-family: monospace;
+
             font-size: 0.9rem;
+
             text-align: center;
+
             margin-bottom: 20px;
-            color: var(--warning);
+
+            color:
+                var(--warning);
         }
 
         .btn {
+
             display: block;
+
             width: 100%;
+
             padding: 12px;
+
             margin-bottom: 12px;
+
             border: none;
+
             border-radius: 6px;
+
             font-size: 1rem;
+
             font-weight: 600;
+
             cursor: pointer;
-            transition: background-color 0.2s, opacity 0.2s;
+
+            transition:
+                background-color 0.2s,
+                opacity 0.2s;
+
             text-align: center;
         }
 
         .btn:disabled {
+
             opacity: 0.4;
+
             cursor: not-allowed;
         }
 
         .btn-primary {
-            background-color: var(--primary);
+
+            background-color:
+                var(--primary);
+
             color: white;
         }
 
         .btn-primary:hover:not(:disabled) {
-            background-color: var(--primary-hover);
+
+            background-color:
+                var(--primary-hover);
         }
 
         .btn-success {
-            background-color: var(--success);
+
+            background-color:
+                var(--success);
+
             color: white;
         }
 
         .btn-success:hover:not(:disabled) {
-            background-color: var(--success-hover);
+
+            background-color:
+                var(--success-hover);
         }
 
         .btn-warning {
-            background-color: var(--warning);
+
+            background-color:
+                var(--warning);
+
             color: white;
         }
 
         .btn-warning:hover:not(:disabled) {
-            background-color: var(--warning-hover);
+
+            background-color:
+                var(--warning-hover);
         }
 
         .btn-danger {
-            background-color: var(--danger);
+
+            background-color:
+                var(--danger);
+
             color: white;
         }
 
         .btn-danger:hover:not(:disabled) {
-            background-color: var(--danger-hover);
+
+            background-color:
+                var(--danger-hover);
         }
 
         .btn-s-mode {
-            background-color: #8b5cf6;
+
+            background-color:
+                #8b5cf6;
+
             color: white;
+
             margin-top: 10px;
         }
 
         .btn-s-mode:hover:not(:disabled) {
-            background-color: #7c3aed;
+
+            background-color:
+                #7c3aed;
         }
 
         .control-group {
+
             display: grid;
-            grid-template-columns: 1fr 1fr;
+
+            grid-template-columns:
+                1fr 1fr;
+
             gap: 12px;
         }
 
         .engine-panel {
-            border-top: 1px dashed var(--border);
+
+            border-top:
+                1px dashed var(--border);
+
             margin-top: 20px;
+
             padding-top: 10px;
         }
 
         textarea {
+
             width: 100%;
+
             height: 150px;
-            background-color: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border);
+
+            background-color:
+                rgba(0, 0, 0, 0.3);
+
+            border:
+                1px solid var(--border);
+
             border-radius: 6px;
+
             color: #51ff00;
+
             font-family: monospace;
+
             padding: 10px;
+
             resize: vertical;
+
             margin-bottom: 12px;
+
             font-size: 0.85rem;
         }
 
         .file-input-wrapper {
+
             margin-bottom: 12px;
         }
 
         input[type="file"] {
+
             display: none;
         }
 
         .file-label {
+
             display: block;
-            background-color: #334155;
-            color: var(--text-color);
+
+            background-color:
+                #334155;
+
+            color:
+                var(--text-color);
+
             padding: 10px;
+
             text-align: center;
+
             border-radius: 6px;
+
             cursor: pointer;
+
             font-size: 0.9rem;
-            border: 1px solid var(--border);
+
+            border:
+                1px solid var(--border);
         }
 
         .file-label:hover {
-            background-color: #475569;
+
+            background-color:
+                #475569;
         }
 
         .range-container {
+
             margin-top: 16px;
-            background-color: rgba(0, 0, 0, 0.1);
+
+            background-color:
+                rgba(0, 0, 0, 0.1);
+
             padding: 12px;
+
             border-radius: 6px;
-            border: 1px solid var(--border);
+
+            border:
+                1px solid var(--border);
         }
 
         .range-label {
+
             display: flex;
-            justify-content: space-between;
+
+            justify-content:
+                space-between;
+
             font-size: 0.9rem;
-            color: var(--text-muted);
+
+            color:
+                var(--text-muted);
+
             margin-bottom: 6px;
         }
 
         input[type="range"] {
+
             width: 100%;
-            accent-color: var(--primary);
+
+            accent-color:
+                var(--primary);
         }
+
     </style>
+
 </head>
 
 <body>
 
 <div class="console-container">
 
-    <h2>8x8x8 CUBE ADVANCED ENGINE</h2>
+    <h2>
+        8x8x8 CUBE ADVANCED ENGINE
+    </h2>
 
-    <div class="status-panel" id="connectionLog">
+    <div
+        class="status-panel"
+        id="connectionLog"
+    >
         INTERFACE STATUS: DISCONNECTED
     </div>
 
-    <button class="btn btn-primary" onclick="connectBLE()">
+    <button
+        class="btn btn-primary"
+        onclick="connectBLE()"
+    >
         Pair HM-10 BLE Module
     </button>
 
     <div class="control-group">
 
-        <button class="btn btn-success"
-                onclick="transmitModeToken('A')">
+        <button
+            class="btn btn-success"
+            onclick="transmitModeToken('A')"
+        >
             Auto Mode ('A')
         </button>
 
-        <button class="btn btn-warning"
-                onclick="transmitModeToken('M')">
+        <button
+            class="btn btn-warning"
+            onclick="transmitModeToken('M')"
+        >
             Manual Mode ('M')
         </button>
 
     </div>
 
-    <button class="btn btn-primary"
-            onclick="transmitModeToken('N')">
+    <button
+        class="btn btn-primary"
+        onclick="transmitModeToken('N')"
+    >
         Next Pattern Step ('N')
     </button>
 
-    <button class="btn btn-s-mode"
-            onclick="enterSMode()">
+    <button
+        class="btn btn-s-mode"
+        id="sModeButton"
+        onclick="enterSMode()"
+    >
         S MODE
     </button>
 
     <div class="engine-panel">
 
-        <h3>CUSTOM .TXT CODE ENGINE (MODE 'S')</h3>
+        <h3>
+            CUSTOM .TXT CODE ENGINE (MODE 'S')
+        </h3>
 
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
-            Upload a .txt script file or write XYZ code. Script automatically saves to local browser storage.
+        <p
+            style="
+                font-size: 0.8rem;
+                color: var(--text-muted);
+                margin-bottom: 10px;
+            "
+        >
+            Upload a .txt script file or write XYZ code.
+            Script automatically saves to local browser storage.
         </p>
 
         <div class="file-input-wrapper">
 
-            <label class="file-label"
-                   for="txtFileInput"
-                   id="fileInputLabel">
+            <label
+                class="file-label"
+                for="txtFileInput"
+                id="fileInputLabel"
+            >
                 Choose Script File (.txt)
             </label>
 
-            <input type="file"
-                   id="txtFileInput"
-                   accept=".txt"
-                   onchange="handleFileLoad(event)">
+            <input
+                type="file"
+                id="txtFileInput"
+                accept=".txt"
+                onchange="handleFileLoad(event)"
+            >
+
         </div>
 
         <textarea
             id="scriptIDE"
-            placeholder="// Enter your animation commands here...&#10;set(0,0,0)&#10;set(7,7,7)&#10;delay 250&#10;set(1,1,1)&#10;delay 250"></textarea>
+            placeholder="// Enter your animation commands here...&#10;set(0,0,0)&#10;set(7,7,7)&#10;delay 250&#10;set(1,1,1)&#10;delay 250"
+        ></textarea>
 
         <div class="control-group">
 
-            <button class="btn btn-primary"
-                    style="background-color: #475569;"
-                    onclick="saveToStorage()">
+            <button
+                class="btn btn-primary"
+                style="background-color: #475569;"
+                onclick="saveToStorage()"
+            >
                 Save Script to Storage
             </button>
 
-            <button class="btn btn-primary"
-                    style="background-color: #475569;"
-                    onclick="parseAndCompileScript()">
+            <button
+                class="btn btn-primary"
+                style="background-color: #475569;"
+                onclick="parseAndCompileScript()"
+            >
                 Compile Code Engine
             </button>
 
         </div>
 
-        <button class="btn btn-s-mode"
-                id="runScriptButton"
-                onclick="executeSModeTransferEngine()"
-                disabled>
+        <button
+            class="btn btn-s-mode"
+            id="runScriptButton"
+            onclick="executeSModeTransferEngine()"
+            disabled
+        >
             DRAW / RUN CUSTOM SCRIPT
         </button>
 
@@ -310,21 +508,36 @@
     <div class="range-container">
 
         <div class="range-label">
-            <span>BRIGHTNESS CONTROL:</span>
-            <span id="brightnessVal">5</span>
+
+            <span>
+                BRIGHTNESS CONTROL:
+            </span>
+
+            <span id="brightnessVal">
+                5
+            </span>
+
         </div>
 
-        <input type="range"
-               id="brightnessRange"
-               min="2"
-               max="8"
-               value="5"
-               oninput="updateBrightness(this.value)">
+        <input
+            type="range"
+            id="brightnessRange"
+            min="2"
+            max="8"
+            value="5"
+            oninput="updateBrightness(this.value)"
+        >
+
     </div>
 
-    <button class="btn btn-danger"
-            style="margin-top: 20px; margin-bottom: 0;"
-            onclick="disconnectBLE()">
+    <button
+        class="btn btn-danger"
+        style="
+            margin-top: 20px;
+            margin-bottom: 0;
+        "
+        onclick="disconnectBLE()"
+    >
         Disconnect Session
     </button>
 
@@ -332,7 +545,12 @@
 
 <script>
 
+// ============================================================
+// BLE VARIABLES
+// ============================================================
+
 let targetDevice = null;
+
 let targetDataCharacteristic = null;
 
 const HM10_SERVICE_UUID =
@@ -341,50 +559,86 @@ const HM10_SERVICE_UUID =
 const HM10_CHARACTERISTIC_UUID =
     "0000ffe1-0000-1000-8000-00805f9b34fb";
 
+// ============================================================
+// SCRIPT VARIABLES
+// ============================================================
+
 let scriptFrames = [];
+
 let scriptPlaybackRunning = false;
+
 let scriptPlaybackToken = 0;
+
+// ============================================================
+// SINGLE SERIAL BLE WRITE QUEUE
+// ============================================================
 
 let bleWriteQueue = Promise.resolve();
 
+// ============================================================
+// WEBPAGE MODE
+// ============================================================
+//
+// NONE = connected but no webpage-selected mode
+// A    = Auto
+// M    = Manual
+// S    = Script
+// ============================================================
+
 let webCubeMode = "NONE";
 
-// --------------------------------------------------
+// ============================================================
 // UI
-// --------------------------------------------------
+// ============================================================
 
 function updateSModeUI() {
 
     const runButton =
-        document.getElementById("runScriptButton");
+        document.getElementById(
+            "runScriptButton"
+        );
 
     runButton.disabled =
-        webCubeMode !== "S" ||
-        !targetDataCharacteristic;
+        (
+            webCubeMode !== "S" ||
+            !targetDataCharacteristic
+        );
 }
 
-// --------------------------------------------------
+// ============================================================
 // STORAGE
-// --------------------------------------------------
+// ============================================================
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener(
+    "DOMContentLoaded",
+    () => {
 
-    const cachedScript =
-        localStorage.getItem("cube_cached_script");
+        const cachedScript =
+            localStorage.getItem(
+                "cube_cached_script"
+            );
 
-    if (cachedScript) {
+        if (cachedScript) {
 
-        document.getElementById("scriptIDE").value =
-            cachedScript;
+            document.getElementById(
+                "scriptIDE"
+            ).value = cachedScript;
+        }
+
+        updateSModeUI();
     }
+);
 
-    updateSModeUI();
-});
+// ============================================================
+// SAVE SCRIPT
+// ============================================================
 
 function saveToStorage() {
 
     const currentCode =
-        document.getElementById("scriptIDE").value;
+        document.getElementById(
+            "scriptIDE"
+        ).value;
 
     localStorage.setItem(
         "cube_cached_script",
@@ -395,6 +649,10 @@ function saveToStorage() {
         "Script saved to browser storage successfully!"
     );
 }
+
+// ============================================================
+// LOAD TXT
+// ============================================================
 
 function handleFileLoad(event) {
 
@@ -407,19 +665,23 @@ function handleFileLoad(event) {
         return;
     }
 
-    const file = input.files[0];
+    const file =
+        input.files[0];
 
     document.getElementById(
         "fileInputLabel"
-    ).innerText = file.name;
+    ).innerText =
+        file.name;
 
-    const reader = new FileReader();
+    const reader =
+        new FileReader();
 
     reader.onload = function() {
 
         document.getElementById(
             "scriptIDE"
-        ).value = reader.result;
+        ).value =
+            reader.result;
 
         localStorage.setItem(
             "cube_cached_script",
@@ -430,16 +692,28 @@ function handleFileLoad(event) {
     reader.readAsText(file);
 }
 
-// --------------------------------------------------
+// ============================================================
 // SCRIPT COMPILER
-// --------------------------------------------------
+// ============================================================
+//
+// Supported commands remain:
+// set(x,y,z)
+// delay ...
+// next
+//
+// The existing parser uses delay/next only as frame
+// separators. Timing remains controlled by the webpage's
+// 250 ms playback interval.
+// ============================================================
 
 function parseAndCompileScript() {
 
     scriptFrames = [];
 
     const rawText =
-        document.getElementById("scriptIDE").value;
+        document.getElementById(
+            "scriptIDE"
+        ).value;
 
     const lines =
         rawText.split("\n");
@@ -463,7 +737,10 @@ function parseAndCompileScript() {
         }
 
         if (
-            line.toLowerCase().startsWith("delay") ||
+            line
+                .toLowerCase()
+                .startsWith("delay") ||
+
             line.toLowerCase() === "next"
         ) {
 
@@ -478,7 +755,8 @@ function parseAndCompileScript() {
                 currentFrameBytes =
                     new Uint8Array(64);
 
-                hasDataInCurrentFrame = false;
+                hasDataInCurrentFrame =
+                    false;
             }
 
             continue;
@@ -492,13 +770,22 @@ function parseAndCompileScript() {
         if (match) {
 
             const x =
-                parseInt(match[1], 10);
+                parseInt(
+                    match[1],
+                    10
+                );
 
             const y =
-                parseInt(match[2], 10);
+                parseInt(
+                    match[2],
+                    10
+                );
 
             const z =
-                parseInt(match[3], 10);
+                parseInt(
+                    match[3],
+                    10
+                );
 
             if (
                 x >= 0 && x < 8 &&
@@ -512,11 +799,14 @@ function parseAndCompileScript() {
                 const byteIndex =
                     (z * 8) + y;
 
-                const bitIndex = x;
+                const bitIndex =
+                    x;
 
                 currentFrameBytes[
                     byteIndex
-                ] |= (1 << bitIndex);
+                ] |= (
+                    1 << bitIndex
+                );
             }
         }
     }
@@ -536,9 +826,9 @@ function parseAndCompileScript() {
     );
 }
 
-// --------------------------------------------------
-// BLE CONNECTION
-// --------------------------------------------------
+// ============================================================
+// CONNECT BLE
+// ============================================================
 
 async function connectBLE() {
 
@@ -557,6 +847,7 @@ async function connectBLE() {
 
         targetDevice =
             await navigator.bluetooth.requestDevice({
+
                 filters: [
                     {
                         services: [
@@ -564,6 +855,7 @@ async function connectBLE() {
                         ]
                     }
                 ],
+
                 optionalServices: [
                     HM10_SERVICE_UUID
                 ]
@@ -597,7 +889,13 @@ async function connectBLE() {
         logDisplay.style.color =
             "var(--success)";
 
-        webCubeMode = "NONE";
+        webCubeMode =
+            "NONE";
+
+        scriptPlaybackRunning =
+            false;
+
+        scriptPlaybackToken++;
 
         updateSModeUI();
 
@@ -610,17 +908,24 @@ async function connectBLE() {
 
         console.error(error);
 
+        targetDataCharacteristic =
+            null;
+
+        webCubeMode =
+            "NONE";
+
+        scriptPlaybackRunning =
+            false;
+
+        scriptPlaybackToken++;
+
+        updateSModeUI();
+
         logDisplay.innerText =
             "CONNECTION FAILED";
 
         logDisplay.style.color =
             "var(--danger)";
-
-        targetDataCharacteristic = null;
-
-        webCubeMode = "NONE";
-
-        updateSModeUI();
 
         alert(
             "BLE Handshake failed: " +
@@ -629,27 +934,29 @@ async function connectBLE() {
     }
 }
 
-// --------------------------------------------------
-// DISCONNECT
-// --------------------------------------------------
+// ============================================================
+// DISCONNECTED
+// ============================================================
 
 function onDisconnected() {
+
+    scriptPlaybackRunning =
+        false;
+
+    scriptPlaybackToken++;
+
+    targetDataCharacteristic =
+        null;
+
+    webCubeMode =
+        "NONE";
+
+    updateSModeUI();
 
     const logDisplay =
         document.getElementById(
             "connectionLog"
         );
-
-    // Stop script immediately.
-    scriptPlaybackRunning = false;
-
-    scriptPlaybackToken++;
-
-    targetDataCharacteristic = null;
-
-    webCubeMode = "NONE";
-
-    updateSModeUI();
 
     logDisplay.innerText =
         "INTERFACE STATUS: DISCONNECTED";
@@ -658,13 +965,22 @@ function onDisconnected() {
         "var(--warning)";
 }
 
+// ============================================================
+// MANUAL DISCONNECT
+// ============================================================
+
 function disconnectBLE() {
 
-    scriptPlaybackRunning = false;
+    scriptPlaybackRunning =
+        false;
 
     scriptPlaybackToken++;
 
-    webCubeMode = "NONE";
+    webCubeMode =
+        "NONE";
+
+    targetDataCharacteristic =
+        null;
 
     updateSModeUI();
 
@@ -672,18 +988,35 @@ function disconnectBLE() {
         targetDevice &&
         targetDevice.gatt.connected
     ) {
+
         targetDevice.gatt.disconnect();
+
+    } else {
+
+        const logDisplay =
+            document.getElementById(
+                "connectionLog"
+            );
+
+        logDisplay.innerText =
+            "INTERFACE STATUS: DISCONNECTED";
+
+        logDisplay.style.color =
+            "var(--warning)";
     }
 }
 
-// --------------------------------------------------
-// QUEUED BLE WRITE
-// --------------------------------------------------
+// ============================================================
+// BLE WRITE QUEUE
+// ============================================================
 //
-// Every write passes through one queue.
-// Script writes also carry a playback token.
-// When mode changes, old script writes are skipped.
-// --------------------------------------------------
+// Important:
+// A rejected previous queue entry must NOT permanently
+// poison the queue. Every new write starts by recovering
+// from any previous rejected write.
+//
+// Each actual GATT write is still performed one at a time.
+// ============================================================
 
 function queueBLEWrite(
     data,
@@ -691,80 +1024,102 @@ function queueBLEWrite(
 ) {
 
     bleWriteQueue =
-        bleWriteQueue.then(async () => {
+        bleWriteQueue
+            .catch(() => {})
+            .then(async () => {
 
-            if (!targetDataCharacteristic) {
-                throw new Error(
-                    "Bluetooth disconnected."
-                );
-            }
+                if (
+                    !targetDataCharacteristic
+                ) {
 
-            if (
-                playbackToken !== null &&
-                playbackToken !== scriptPlaybackToken
-            ) {
-                return;
-            }
-
-            let attempts = 0;
-
-            while (attempts < 5) {
+                    throw new Error(
+                        "Bluetooth disconnected."
+                    );
+                }
 
                 if (
                     playbackToken !== null &&
-                    playbackToken !== scriptPlaybackToken
+                    playbackToken !==
+                        scriptPlaybackToken
                 ) {
+
                     return;
                 }
 
-                try {
+                let attempts = 0;
 
-                    await targetDataCharacteristic
-                        .writeValueWithoutResponse(
-                            data
-                        );
-
-                    await new Promise(
-                        resolve =>
-                            setTimeout(resolve, 70)
-                    );
-
-                    return;
-
-                } catch (error) {
-
-                    attempts++;
+                while (attempts < 5) {
 
                     if (
-                        !error.message ||
-                        !error.message
-                            .toLowerCase()
-                            .includes(
-                                "already in progress"
-                            )
+                        playbackToken !== null &&
+                        playbackToken !==
+                            scriptPlaybackToken
                     ) {
 
-                        throw error;
+                        return;
                     }
 
-                    await new Promise(
-                        resolve =>
-                            setTimeout(resolve, 150)
-                    );
-                }
-            }
+                    try {
 
-            throw new Error(
-                "BLE GATT remained busy after multiple retries."
-            );
-        });
+                        await
+                            targetDataCharacteristic
+                                .writeValueWithoutResponse(
+                                    data
+                                );
+
+                        await new Promise(
+                            resolve =>
+                                setTimeout(
+                                    resolve,
+                                    70
+                                )
+                        );
+
+                        return;
+
+                    } catch (error) {
+
+                        attempts++;
+
+                        if (
+                            !error.message ||
+                            !error.message
+                                .toLowerCase()
+                                .includes(
+                                    "already in progress"
+                                )
+                        ) {
+
+                            throw error;
+                        }
+
+                        await new Promise(
+                            resolve =>
+                                setTimeout(
+                                    resolve,
+                                    150
+                                )
+                        );
+                    }
+                }
+
+                throw new Error(
+                    "BLE GATT remained busy after multiple retries."
+                );
+            });
 
     return bleWriteQueue;
 }
 
-// --------------------------------------------------
+// ============================================================
 // BRIGHTNESS
-// --------------------------------------------------
+// ============================================================
+//
+// Arduino expects:
+// B + value
+//
+// Both bytes are sent in ONE queued GATT write.
+// ============================================================
 
 async function updateBrightness(val) {
 
@@ -772,50 +1127,40 @@ async function updateBrightness(val) {
         "brightnessVal"
     ).innerText = val;
 
-    const headerBuffer =
-        new TextEncoder().encode("B");
+    const value =
+        parseInt(
+            val,
+            10
+        );
 
-    const dataBuffer =
+    const brightnessPacket =
         new Uint8Array([
-            parseInt(val, 10)
+            0x42, // ASCII B
+            value
         ]);
 
-    bleWriteQueue =
-        bleWriteQueue.then(async () => {
+    try {
 
-            if (!targetDataCharacteristic) {
-                return;
-            }
+        await queueBLEWrite(
+            brightnessPacket
+        );
 
-            await targetDataCharacteristic
-                .writeValueWithoutResponse(
-                    headerBuffer
-                );
+    } catch (error) {
 
-            await new Promise(
-                resolve =>
-                    setTimeout(resolve, 40)
-            );
-
-            await targetDataCharacteristic
-                .writeValueWithoutResponse(
-                    dataBuffer
-                );
-
-            await new Promise(
-                resolve =>
-                    setTimeout(resolve, 60)
-            );
-        });
-
-    return bleWriteQueue;
+        console.error(
+            "Brightness transmission:",
+            error
+        );
+    }
 }
 
-// --------------------------------------------------
+// ============================================================
 // AUTO / MANUAL / NEXT
-// --------------------------------------------------
+// ============================================================
 
-async function transmitModeToken(tokenChar) {
+async function transmitModeToken(
+    tokenChar
+) {
 
     if (!targetDataCharacteristic) {
         return;
@@ -828,23 +1173,30 @@ async function transmitModeToken(tokenChar) {
         tokenChar === "Q"
     ) {
 
-        scriptPlaybackRunning = false;
+        scriptPlaybackRunning =
+            false;
+
         scriptPlaybackToken++;
     }
 
+    // --------------------------------------------------------
+    // WEBPAGE MODE
+    // --------------------------------------------------------
+
     if (tokenChar === "A") {
 
-        webCubeMode = "A";
-    }
+        webCubeMode =
+            "A";
 
-    else if (tokenChar === "M") {
+    } else if (tokenChar === "M") {
 
-        webCubeMode = "M";
-    }
+        webCubeMode =
+            "M";
 
-    else if (tokenChar === "Q") {
+    } else if (tokenChar === "Q") {
 
-        webCubeMode = "A";
+        webCubeMode =
+            "A";
     }
 
     updateSModeUI();
@@ -854,17 +1206,35 @@ async function transmitModeToken(tokenChar) {
             tokenChar
         );
 
-    return queueBLEWrite(buffer);
+    try {
+
+        await queueBLEWrite(
+            buffer
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Mode transmission:",
+            error
+        );
+    }
 }
 
-// --------------------------------------------------
+// ============================================================
 // ENTER S MODE
-// --------------------------------------------------
+// ============================================================
 //
-// This is deliberately a separate S command.
-// It is NOT the same as a frame.
-// Arduino receives 'S' and clears the cube once.
-// --------------------------------------------------
+// Sends exactly:
+//
+// ASCII 'S'
+//
+// Arduino receives S and immediately:
+// 1. enters mode 2
+// 2. stops built-in animation
+// 3. clears cube
+// 4. waits for frames
+// ============================================================
 
 async function enterSMode() {
 
@@ -877,18 +1247,24 @@ async function enterSMode() {
         return;
     }
 
-    scriptPlaybackRunning = false;
+    // Stop any previous script loop.
+    scriptPlaybackRunning =
+        false;
 
     scriptPlaybackToken++;
 
-    webCubeMode = "S";
+    // Mark webpage as S mode.
+    webCubeMode =
+        "S";
 
     updateSModeUI();
 
     const sModeCommand =
-        new TextEncoder().encode("S");
+        new Uint8Array([
+            0x53 // ASCII 'S'
+        ]);
 
-    const statusDisplay =
+    const logDisplay =
         document.getElementById(
             "connectionLog"
         );
@@ -899,20 +1275,33 @@ async function enterSMode() {
             sModeCommand
         );
 
-        statusDisplay.innerText =
-            "CONNECTED (S MODE / READY)";
+        // Only after S command successfully enters
+        // the queue do we report S ready.
 
-        statusDisplay.style.color =
-            "#8b5cf6";
+        if (
+            webCubeMode === "S" &&
+            targetDataCharacteristic
+        ) {
+
+            logDisplay.innerText =
+                "CONNECTED (S MODE / READY)";
+
+            logDisplay.style.color =
+                "#8b5cf6";
+        }
 
     } catch (error) {
 
-        webCubeMode = "NONE";
+        webCubeMode =
+            "NONE";
 
         updateSModeUI();
 
-        statusDisplay.innerText =
+        logDisplay.innerText =
             "S MODE ENTRY FAILED";
+
+        logDisplay.style.color =
+            "var(--danger)";
 
         alert(
             "S-Mode entry failed: " +
@@ -921,27 +1310,47 @@ async function enterSMode() {
     }
 }
 
-// --------------------------------------------------
-// SEND ONE 64-BYTE FRAME
-// --------------------------------------------------
+// ============================================================
+// SEND ONE SCRIPT FRAME
+// ============================================================
+//
+// Full logical packet:
+//
+// FF 53 + 64 frame bytes
+//
+// 66 bytes total.
+//
+// BLE HM-10 write limit:
+// 20 bytes.
+//
+// Therefore split into:
+// 20
+// 20
+// 20
+// 6
+// ============================================================
 
 async function sendSingleScriptFrame(
     frameBytes,
     playbackToken
 ) {
 
-    let packet =
+    const packet =
         new Uint8Array(66);
 
-    packet[0] = 0xFF;
-    packet[1] = 83; // ASCII 'S'
+    packet[0] =
+        0xFF;
+
+    packet[1] =
+        0x53; // ASCII S
 
     packet.set(
         frameBytes,
         2
     );
 
-    const CHUNK_SIZE = 20;
+    const CHUNK_SIZE =
+        20;
 
     for (
         let i = 0;
@@ -951,9 +1360,11 @@ async function sendSingleScriptFrame(
 
         if (
             !scriptPlaybackRunning ||
-            playbackToken !== scriptPlaybackToken ||
+            playbackToken !==
+                scriptPlaybackToken ||
             webCubeMode !== "S"
         ) {
+
             return;
         }
 
@@ -973,9 +1384,12 @@ async function sendSingleScriptFrame(
     }
 }
 
-// --------------------------------------------------
-// SCRIPT PLAYBACK
-// --------------------------------------------------
+// ============================================================
+// RUN SCRIPT
+// ============================================================
+//
+// Can ONLY execute in S mode.
+// ============================================================
 
 async function executeSModeTransferEngine() {
 
@@ -988,7 +1402,6 @@ async function executeSModeTransferEngine() {
         return;
     }
 
-    // Run button works ONLY in S mode.
     if (webCubeMode !== "S") {
 
         alert(
@@ -998,25 +1411,35 @@ async function executeSModeTransferEngine() {
         return;
     }
 
-    scriptPlaybackRunning = false;
+    // Stop a previous script loop.
+    scriptPlaybackRunning =
+        false;
 
     scriptPlaybackToken++;
 
     const myToken =
         scriptPlaybackToken;
 
-    await bleWriteQueue;
+    // Wait for all writes already queued before compiling
+    // and starting the frame loop.
+    await bleWriteQueue.catch(
+        () => {}
+    );
 
     if (
-        myToken !== scriptPlaybackToken ||
+        myToken !==
+            scriptPlaybackToken ||
         webCubeMode !== "S"
     ) {
+
         return;
     }
 
     parseAndCompileScript();
 
-    if (scriptFrames.length === 0) {
+    if (
+        scriptFrames.length === 0
+    ) {
 
         alert(
             "No valid frames found."
@@ -1025,7 +1448,8 @@ async function executeSModeTransferEngine() {
         return;
     }
 
-    scriptPlaybackRunning = true;
+    scriptPlaybackRunning =
+        true;
 
     const statusDisplay =
         document.getElementById(
@@ -1044,50 +1468,66 @@ async function executeSModeTransferEngine() {
 
         while (
             scriptPlaybackRunning &&
-            myToken === scriptPlaybackToken &&
+            myToken ===
+                scriptPlaybackToken &&
             webCubeMode === "S"
         ) {
 
             for (
                 let frameIndex = 0;
-                frameIndex < scriptFrames.length;
+                frameIndex <
+                    scriptFrames.length;
                 frameIndex++
             ) {
 
                 if (
                     !scriptPlaybackRunning ||
-                    myToken !== scriptPlaybackToken ||
+                    myToken !==
+                        scriptPlaybackToken ||
                     webCubeMode !== "S"
                 ) {
+
                     break;
                 }
 
                 await sendSingleScriptFrame(
-                    scriptFrames[frameIndex],
+                    scriptFrames[
+                        frameIndex
+                    ],
                     myToken
                 );
 
                 if (
                     !scriptPlaybackRunning ||
-                    myToken !== scriptPlaybackToken ||
+                    myToken !==
+                        scriptPlaybackToken ||
                     webCubeMode !== "S"
                 ) {
+
                     break;
                 }
 
+                // Existing playback timing.
                 await new Promise(
                     resolve =>
-                        setTimeout(resolve, 250)
+                        setTimeout(
+                            resolve,
+                            250
+                        )
                 );
             }
         }
 
     } catch (error) {
 
-        scriptPlaybackRunning = false;
+        scriptPlaybackRunning =
+            false;
 
         statusDisplay.innerText =
             "TRANSMISSION ERROR";
+
+        statusDisplay.style.color =
+            "var(--danger)";
 
         alert(
             "S-Mode transmission failed: " +
@@ -1100,7 +1540,8 @@ async function executeSModeTransferEngine() {
     if (
         targetDataCharacteristic &&
         webCubeMode === "S" &&
-        myToken === scriptPlaybackToken
+        myToken ===
+            scriptPlaybackToken
     ) {
 
         statusDisplay.innerText =
