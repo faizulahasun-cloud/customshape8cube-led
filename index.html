@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>8x8x8 LED Cube Console - Hybrid Studio</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #E0E0E0; padding: 30px; margin: 0; }
+        .dashboard-container { max-width: 650px; margin: 20px auto; background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        h2, h3 { margin-top: 0; color: #FFFFFF; font-weight: 600; border-bottom: 1px solid #2D2D2D; padding-bottom: 12px; }
+        .status-box { background: #262626; padding: 12px 18px; border-radius: 6px; font-weight: bold; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .status-disconnected { color: #FF5252; }
+        .status-connected { color: #00E676; }
+        .control-grid { display: flex; flex-direction: column; gap: 15px; }
+        .btn { width: 100%; background: #2979FF; color: #FFFFFF; border: none; padding: 12px; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .btn:hover { background: #2962FF; }
+        .btn-disconnect { background: #333333; border: 1px solid #444; }
+        .btn-disconnect:hover { background: #D50000; }
+        .btn-action { background: #00E676; color: #121212; }
+        .btn-custom { background: #AA00FF; color: #FFFFFF; }
+        .btn-custom:hover { background: #7B1FA2; }
+        .slider-block { background: #262626; border: 1px solid #333; padding: 15px; border-radius: 6px; }
+        input[type=range] { width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <h2>8x8x8 LED CUBE CONTROLLER</h2>
+    
+    <div class="status-box">
+        <span>INTERFACE STATUS:</span>
+        <span id="connectionLog" class="status-disconnected">DISCONNECTED</span>
+    </div>
+
+    <div class="control-grid">
+        <button id="connectBtn" class="btn" onclick="triggerBLELinkSession()">Pair HM-10 BLE Module</button>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <button class="btn btn-action" onclick="transmitModeToken('A')">Auto Mode ('A')</button>
+            <button class="btn btn-action" onclick="transmitModeToken('M')">Manual Mode ('M')</button>
+        </div>
+
+        <button class="btn" style="background:#FFD600; color:#121212;" onclick="transmitModeToken('N')">Next Pattern Step ('N')</button>
+
+        <h3>CUSTOM STORAGE SHAPES (MODE 'S')</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <button class="btn btn-custom" onclick="sendCustomShape('HEART')">Send 3D Heart</button>
+            <button class="btn btn-custom" onclick="sendCustomShape('CROSS')">Send 3D Cross</button>
+        </div>
+
+        <div class="slider-block">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span>BRIGHTNESS CONTROL:</span>
+                <span id="sliderValLabel">5</span>
+            </div>
+            <input type="range" id="brightnessInputSlider" min="2" max="8" value="5" step="1" oninput="executeBrightnessShift(this.value)">
+        </div>
+
+        <button id="disconnectBtn" class="btn btn-disconnect" onclick="terminateConnectionSequence()" style="display:none;">Disconnect Session</button>
+    </div>
+</div>
+
+<script>
+    const HM10_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
+    const HM10_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+    let physicalTargetDevice = null;
+    let targetDataCharacteristic = null;
+
+    async function triggerBLELinkSession() {
+        const statusDisplay = document.getElementById('connectionLog');
+        try {
+            statusDisplay.innerText = "SEARCHING...";
+            physicalTargetDevice = await navigator.bluetooth.requestDevice({
+                filters: [{ services: [HM10_SERVICE_UUID] }]
+            });
+            const targetGattServer = await physicalTargetDevice.gatt.connect();
+            const targetService = await targetGattServer.getPrimaryService(HM10_SERVICE_UUID);
+            targetDataCharacteristic = await targetService.getCharacteristic(HM10_CHAR_UUID);
+
+            statusDisplay.innerText = "CONNECTED";
+            statusDisplay.className = "status-connected";
+            document.getElementById('connectBtn').style.display = "none";
+            document.getElementById('disconnectBtn').style.display = "block";
+
+            physicalTargetDevice.addEventListener('gattserverdisconnected', cleanSessionStateWipe);
+        } catch(error) {
+            statusDisplay.innerText = "DISCONNECTED";
+            statusDisplay.className = "status-disconnected";
+            alert("Connection Failed: " + error.message);
+        }
+    }
+
+    async function transmitModeToken(tokenChar) {
+        if (!targetDataCharacteristic) return;
+        const buffer = new TextEncoder().encode(tokenChar);
+        await targetDataCharacteristic.writeValueWithoutResponse(buffer);
+    }
+
+    async function executeBrightnessShift(val) {
+        document.getElementById('sliderValLabel').innerText = val;
+        if (!targetDataCharacteristic) return;
+        const dataPayload = new Uint8Array([66, parseInt(val)]); // 'B' + level
+        await targetDataCharacteristic.writeValueWithoutResponse(dataPayload);
+    }
+
+    // --- SENDS A 64-BYTE RAW SHAPE MATRIX IN SAFE 16-BYTE CHUNKS OVER BLE ---
+    async function send64ByteCustomMatrix(matrix64Bytes) {
+        if (!targetDataCharacteristic) return;
+
+        // Step 1: Send 'S' token to trigger Mode 2 Receiver on Arduino
+        await transmitModeToken('S');
+        await new Promise(r => setTimeout(r, 50)); 
+
+        // Step 2: Send 64 bytes in 4 chunks of 16 bytes
+        const CHUNK_SIZE = 16;
+        for (let i = 0; i < matrix64Bytes.length; i += CHUNK_SIZE) {
+            const chunk = matrix64Bytes.slice(i, i + CHUNK_SIZE);
+            await targetDataCharacteristic.writeValueWithoutResponse(chunk);
+            await new Promise(r => setTimeout(r, 20)); // Small pause for HM-10 UART
+        }
+    }
+
+    function sendCustomShape(type) {
+        let frame64 = new Uint8Array(64);
+
+        if (type === 'HEART') {
+            // Preset 3D Heart Bitmask Example
+            for(let i=0; i<64; i++) {
+                if (i >= 16 && i <= 48) frame64[i] = 0b01100110; 
+                if (i >= 24 && i <= 40) frame64[i] = 0b11111111; 
+            }
+        } else if (type === 'CROSS') {
+            // Preset 3D Cross Pattern Example
+            for(let z=0; z<8; z++) {
+                frame64[z*8 + 3] = 0xFF; 
+                frame64[z*8 + 4] = 0xFF; 
+            }
+        }
+
+        send64ByteCustomMatrix(frame64);
+    }
+
+    async function terminateConnectionSequence() {
+        if (!physicalTargetDevice) return;
+        if (physicalTargetDevice.gatt.connected) {
+            await transmitModeToken('Q');
+            await physicalTargetDevice.gatt.disconnect();
+        }
+    }
+
+    function cleanSessionStateWipe() {
+        document.getElementById('connectionLog').innerText = "DISCONNECTED";
+        document.getElementById('connectionLog').className = "status-disconnected";
+        document.getElementById('connectBtn').style.display = "block";
+        document.getElementById('disconnectBtn').style.display = "none";
+        targetDataCharacteristic = null;
+        physicalTargetDevice = null;
+    }
+</script>
+</body>
+</html>
