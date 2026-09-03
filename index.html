@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 
 <meta charset="UTF-8">
@@ -35,7 +36,6 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-
     font-family:
         -apple-system,
         BlinkMacSystemFont,
@@ -49,7 +49,6 @@
 body {
     background-color: var(--bg-color);
     color: var(--text-color);
-
     padding: 20px;
 
     display: flex;
@@ -62,7 +61,9 @@ body {
 .console-container {
     background-color: var(--panel-bg);
 
-    border: 1px solid var(--border);
+    border:
+        1px solid var(--border);
+
     border-radius: 12px;
 
     width: 100%;
@@ -72,12 +73,13 @@ body {
 
     box-shadow:
         0 10px 25px -5px
-        rgba(0, 0, 0, 0.3);
+        rgba(0,0,0,0.3);
 }
 
 h2 {
     font-size: 1.5rem;
     letter-spacing: 1px;
+
     text-align: center;
 
     margin-bottom: 20px;
@@ -104,7 +106,7 @@ h3 {
 
 .status-panel {
     background-color:
-        rgba(0, 0, 0, 0.2);
+        rgba(0,0,0,0.2);
 
     border:
         1px solid var(--border);
@@ -139,6 +141,7 @@ h3 {
     border-radius: 6px;
 
     font-size: 1rem;
+
     font-weight: 600;
 
     cursor: pointer;
@@ -241,7 +244,7 @@ textarea {
     height: 150px;
 
     background-color:
-        rgba(0, 0, 0, 0.3);
+        rgba(0,0,0,0.3);
 
     border:
         1px solid var(--border);
@@ -301,7 +304,7 @@ input[type="file"] {
     margin-top: 16px;
 
     background-color:
-        rgba(0, 0, 0, 0.1);
+        rgba(0,0,0,0.1);
 
     padding: 12px;
 
@@ -398,13 +401,12 @@ input[type="range"] {
 
 <p
     style="
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        margin-bottom: 10px;
+        font-size:0.8rem;
+        color:var(--text-muted);
+        margin-bottom:10px;
     "
 >
     Use set(x,y,z), delay milliseconds, and next.
-    Each delay controls the time before the next frame.
 </p>
 
 <div class="file-input-wrapper">
@@ -519,19 +521,23 @@ const HM10_CHARACTERISTIC_UUID =
 // ============================================================
 // SCRIPT
 // ============================================================
-
-let scriptFrames = [];
-
-// Each item:
+//
+// Each frame:
 //
 // {
 //     bytes: Uint8Array(64),
-//     delay: number
+//     delay: milliseconds
 // }
+//
+// ============================================================
+
+let scriptFrames = [];
 
 let scriptPlaybackRunning = false;
 
 let scriptPlaybackToken = 0;
+
+let nextScriptFrameId = 0;
 
 // ============================================================
 // BLE QUEUE
@@ -650,38 +656,34 @@ function handleFileLoad(event) {
 // DELAY PARSER
 // ============================================================
 //
-// Supports:
+// Supported:
 //
+// delay 50
 // delay 100
 // delay 250
 // delay(100)
+// next
 //
-// "next" also ends the current frame.
-//
-// IMPORTANT:
-// The number is now actually used.
 // ============================================================
 
 function parseDelayCommand(line) {
 
-    let match =
+    const match =
         line.match(
             /^delay\s*(?:\(\s*)?(\d+)(?:\s*\))?\s*$/i
         );
 
-    if (!match) {
+    if (!match)
         return null;
-    }
 
-    let value =
+    const value =
         parseInt(
             match[1],
             10
         );
 
-    if (!Number.isFinite(value)) {
+    if (!Number.isFinite(value))
         return null;
-    }
 
     return Math.max(
         0,
@@ -690,7 +692,7 @@ function parseDelayCommand(line) {
 }
 
 // ============================================================
-// SCRIPT COMPILER
+// COMPILE SCRIPT
 // ============================================================
 
 function parseAndCompileScript() {
@@ -711,8 +713,8 @@ function parseAndCompileScript() {
     let hasData =
         false;
 
-    // Default only when a frame has no explicit delay.
-    const DEFAULT_FRAME_DELAY = 250;
+    const DEFAULT_FRAME_DELAY =
+        250;
 
     for (
         let line of lines
@@ -733,26 +735,29 @@ function parseAndCompileScript() {
         // DELAY
         // ----------------------------------------------------
 
-        const delayValue =
+        const delay =
             parseDelayCommand(line);
 
-        if (delayValue !== null) {
+        if (delay !== null) {
 
             if (hasData) {
 
                 scriptFrames.push({
+
                     bytes:
                         new Uint8Array(
                             currentFrameBytes
                         ),
+
                     delay:
-                        delayValue
+                        delay
                 });
 
                 currentFrameBytes =
                     new Uint8Array(64);
 
-                hasData = false;
+                hasData =
+                    false;
             }
 
             continue;
@@ -770,10 +775,12 @@ function parseAndCompileScript() {
             if (hasData) {
 
                 scriptFrames.push({
+
                     bytes:
                         new Uint8Array(
                             currentFrameBytes
                         ),
+
                     delay:
                         DEFAULT_FRAME_DELAY
                 });
@@ -781,7 +788,8 @@ function parseAndCompileScript() {
                 currentFrameBytes =
                     new Uint8Array(64);
 
-                hasData = false;
+                hasData =
+                    false;
             }
 
             continue;
@@ -796,9 +804,8 @@ function parseAndCompileScript() {
                 /set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i
             );
 
-        if (!match) {
+        if (!match)
             continue;
-        }
 
         const x =
             parseInt(
@@ -829,15 +836,13 @@ function parseAndCompileScript() {
         const byteIndex =
             (z * 8) + y;
 
-        const bitIndex =
-            x;
-
         currentFrameBytes[
             byteIndex
         ] |=
-            (1 << bitIndex);
+            (1 << x);
 
-        hasData = true;
+        hasData =
+            true;
     }
 
     // --------------------------------------------------------
@@ -847,6 +852,7 @@ function parseAndCompileScript() {
     if (hasData) {
 
         scriptFrames.push({
+
             bytes:
                 new Uint8Array(
                     currentFrameBytes
@@ -858,7 +864,7 @@ function parseAndCompileScript() {
     }
 
     console.log(
-        "Compiled script:",
+        "Compiled:",
         scriptFrames.length,
         "frames"
     );
@@ -885,6 +891,7 @@ async function connectBLE() {
 
         targetDevice =
             await navigator.bluetooth.requestDevice({
+
                 filters: [
                     {
                         services: [
@@ -1040,7 +1047,7 @@ function disconnectBLE() {
 }
 
 // ============================================================
-// QUEUED SINGLE BLE WRITE
+// SINGLE QUEUED BLE WRITE
 // ============================================================
 
 function queueBLEWrite(
@@ -1073,7 +1080,9 @@ function queueBLEWrite(
 
                 let attempts = 0;
 
-                while (attempts < 5) {
+                while (
+                    attempts < 5
+                ) {
 
                     if (
                         playbackToken !== null &&
@@ -1092,23 +1101,20 @@ function queueBLEWrite(
                                     data
                                 );
 
-                        await new Promise(
-                            resolve =>
-                                setTimeout(
-                                    resolve,
-                                    70
-                                )
-                        );
-
                         return;
 
                     } catch (error) {
 
                         attempts++;
 
+                        const message =
+                            error &&
+                            error.message
+                                ? error.message
+                                : "";
+
                         if (
-                            !error.message ||
-                            !error.message
+                            !message
                                 .toLowerCase()
                                 .includes(
                                     "already in progress"
@@ -1122,7 +1128,7 @@ function queueBLEWrite(
                             resolve =>
                                 setTimeout(
                                     resolve,
-                                    150
+                                    100
                                 )
                         );
                     }
@@ -1153,55 +1159,67 @@ async function updateBrightness(val) {
             10
         );
 
-    const packet =
-        new Uint8Array([
-            0x42,
-            value
-        ]);
-
     try {
 
         await queueBLEWrite(
-            packet
+            new Uint8Array([
+                0x42,
+                value
+            ])
         );
 
     } catch (error) {
 
         console.error(
-            "Brightness:",
+            "Brightness transmission:",
             error
         );
     }
 }
 
 // ============================================================
-// AUTO / MANUAL / NEXT
+// AUTO / MANUAL / NEXT / Q
 // ============================================================
 
 async function transmitModeToken(
     tokenChar
 ) {
 
-    if (!targetDataCharacteristic) {
+    if (!targetDataCharacteristic)
+        return;
+
+    // N is only meaningful in Manual.
+    if (
+        tokenChar === "N" &&
+        webCubeMode !== "M"
+    ) {
         return;
     }
 
-    scriptPlaybackRunning =
-        false;
-
-    scriptPlaybackToken++;
-
+    // These commands stop S playback.
     if (
         tokenChar === "A" ||
-        tokenChar === "M"
-    ) {
-
-        webCubeMode =
-            tokenChar;
-
-    } else if (
+        tokenChar === "M" ||
         tokenChar === "Q"
     ) {
+
+        scriptPlaybackRunning =
+            false;
+
+        scriptPlaybackToken++;
+    }
+
+    if (tokenChar === "A") {
+
+        webCubeMode =
+            "A";
+
+    } else if (tokenChar === "M") {
+
+        webCubeMode =
+            "M";
+
+    } else if (tokenChar === "Q") {
 
         webCubeMode =
             "A";
@@ -1258,8 +1276,6 @@ async function enterSMode() {
 
     try {
 
-        // EXACT S MODE COMMAND:
-        // ASCII 53 hex
         await queueBLEWrite(
             new Uint8Array([
                 0x53
@@ -1267,8 +1283,8 @@ async function enterSMode() {
         );
 
         if (
-            webCubeMode === "S" &&
-            targetDataCharacteristic
+            targetDataCharacteristic &&
+            webCubeMode === "S"
         ) {
 
             statusDisplay.innerText =
@@ -1302,18 +1318,13 @@ async function enterSMode() {
 // SEND ONE SCRIPT FRAME
 // ============================================================
 //
-// Logical packet:
+// Four 20-byte packets:
 //
-// FF 53 + 64 bytes
+// FF 53 FrameID 00 + bytes  0..15
+// FF 53 FrameID 01 + bytes 16..31
+// FF 53 FrameID 02 + bytes 32..47
+// FF 53 FrameID 03 + bytes 48..63
 //
-// Physical BLE writes:
-//
-// 20 bytes
-// 20 bytes
-// 20 bytes
-//  6 bytes
-//
-// Arduino keeps its parser state between writes.
 // ============================================================
 
 async function sendSingleScriptFrame(
@@ -1321,27 +1332,18 @@ async function sendSingleScriptFrame(
     playbackToken
 ) {
 
-    const packet =
-        new Uint8Array(66);
+    const frameId =
+        nextScriptFrameId;
 
-    packet[0] =
-        0xFF;
-
-    packet[1] =
-        0x53;
-
-    packet.set(
-        frameBytes,
-        2
-    );
-
-    const CHUNK_SIZE =
-        20;
+    nextScriptFrameId =
+        (
+            nextScriptFrameId + 1
+        ) & 0xFF;
 
     for (
-        let i = 0;
-        i < packet.length;
-        i += CHUNK_SIZE
+        let chunkId = 0;
+        chunkId < 4;
+        chunkId++
     ) {
 
         if (
@@ -1351,23 +1353,39 @@ async function sendSingleScriptFrame(
             webCubeMode !== "S"
         ) {
 
-            return;
+            return false;
         }
 
-        const chunk =
-            packet.slice(
-                i,
-                Math.min(
-                    i + CHUNK_SIZE,
-                    packet.length
-                )
-            );
+        const packet =
+            new Uint8Array(20);
+
+        packet[0] =
+            0xFF;
+
+        packet[1] =
+            0x53;
+
+        packet[2] =
+            frameId;
+
+        packet[3] =
+            chunkId;
+
+        packet.set(
+            frameBytes.slice(
+                chunkId * 16,
+                (chunkId * 16) + 16
+            ),
+            4
+        );
 
         await queueBLEWrite(
-            chunk,
+            packet,
             playbackToken
         );
     }
+
+    return true;
 }
 
 // ============================================================
@@ -1475,12 +1493,14 @@ async function executeSModeTransferEngine() {
                         frameIndex
                     ];
 
-                await sendSingleScriptFrame(
-                    frame.bytes,
-                    myToken
-                );
+                const sent =
+                    await sendSingleScriptFrame(
+                        frame.bytes,
+                        myToken
+                    );
 
                 if (
+                    !sent ||
                     !scriptPlaybackRunning ||
                     myToken !==
                         scriptPlaybackToken ||
@@ -1490,9 +1510,7 @@ async function executeSModeTransferEngine() {
                     break;
                 }
 
-                // THIS IS NOW THE SCRIPT'S
-                // ACTUAL DELAY VALUE.
-
+                // Actual delay from TXT.
                 await new Promise(
                     resolve =>
                         setTimeout(
@@ -1514,9 +1532,9 @@ async function executeSModeTransferEngine() {
         statusDisplay.style.color =
             "var(--danger)";
 
-        alert(
-            "S-Mode transmission failed: " +
-            error.message
+        console.error(
+            "S-Mode:",
+            error
         );
 
         return;
