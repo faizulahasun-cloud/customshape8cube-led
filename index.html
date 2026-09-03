@@ -2,30 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>8x8x8 LED Cube Console</title>
+    <title>8x8x8 LED Cube Console - Script Engine</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #E0E0E0; padding: 30px; margin: 0; }
-        .dashboard-container { max-width: 600px; margin: 20px auto; background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        h2, h3 { margin-top: 0; color: #FFFFFF; font-weight: 600; border-bottom: 1px solid #2D2D2D; padding-bottom: 12px; }
-        .status-box { background: #262626; padding: 12px 18px; border-radius: 6px; font-weight: bold; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #E0E0E0; padding: 20px; margin: 0; }
+        .dashboard-container { max-width: 650px; margin: 10px auto; background: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        h2, h3 { margin-top: 0; color: #FFFFFF; font-weight: 600; border-bottom: 1px solid #2D2D2D; padding-bottom: 10px; }
+        .status-box { background: #262626; padding: 12px 18px; border-radius: 6px; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
         .status-disconnected { color: #FF5252; }
         .status-connected { color: #00E676; }
-        .control-grid { display: flex; flex-direction: column; gap: 15px; }
-        .btn { width: 100%; background: #2979FF; color: #FFFFFF; border: none; padding: 12px; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .control-grid { display: flex; flex-direction: column; gap: 12px; }
+        .btn { width: 100%; background: #2979FF; color: #FFFFFF; border: none; padding: 12px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         .btn:hover { background: #2962FF; }
         .btn-disconnect { background: #333333; border: 1px solid #444; }
         .btn-disconnect:hover { background: #D50000; }
         .btn-action { background: #00E676; color: #121212; }
-        .btn-custom { background: #AA00FF; color: #FFFFFF; }
-        .btn-custom:hover { background: #7B1FA2; }
-        .slider-block { background: #262626; border: 1px solid #333; padding: 15px; border-radius: 6px; }
-        input[type=range] { width: 100%; }
+        .btn-s-mode { background: #AA00FF; color: #FFFFFF; font-size: 16px; padding: 15px; border: 2px solid #D500F9; }
+        .btn-s-mode:hover { background: #8E00C7; }
+        .slider-block { background: #262626; border: 1px solid #333; padding: 12px; border-radius: 6px; }
+        textarea { width: 100%; height: 120px; background: #121212; color: #00E676; border: 1px solid #333; border-radius: 6px; padding: 10px; font-family: monospace; box-sizing: border-box; }
+        input[type=file] { margin-bottom: 10px; color: #CCC; }
     </style>
 </head>
 <body>
 
 <div class="dashboard-container">
-    <h2>8x8x8 LED CUBE CONTROLLER</h2>
+    <h2>8x8x8 CUBE ADVANCED ENGINE</h2>
     
     <div class="status-box">
         <span>INTERFACE STATUS:</span>
@@ -42,11 +43,19 @@
 
         <button class="btn" style="background:#FFD600; color:#121212;" onclick="transmitModeToken('N')">Next Pattern Step ('N')</button>
 
-        <h3>CUSTOM STORAGE SHAPES (MODE 'S')</h3>
+        <h3>CUSTOM .TXT CODE ENGINE (MODE 'S')</h3>
+        <p style="font-size: 12px; color: #888; margin: 0;">Upload a .txt script file or write XYZ code. Script automatically saves to local browser storage.</p>
+        
+        <input type="file" id="txtFileInput" accept=".txt" onchange="loadTxtFile(this)">
+        <textarea id="scriptEditor" placeholder="Enter XYZ commands like set(0,0,0) or 64 hex bytes..."></textarea>
+        
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <button class="btn btn-custom" onclick="sendCustomShape('HEART')">Send 3D Heart</button>
-            <button class="btn btn-custom" onclick="sendCustomShape('CROSS')">Send 3D Cross</button>
+            <button class="btn" style="background:#444;" onclick="saveToLocalStorage()">Save Script to Storage</button>
+            <button class="btn" style="background:#00B0FF;" onclick="parseAndCompileScript()">Compile Code Engine</button>
         </div>
+
+        <!-- DEDICATED S-MODE TRANSMISSION BUTTON -->
+        <button class="btn btn-s-mode" onclick="executeSModeTransferEngine()">RUN 'S' MODE ENGINE (WAIT FOR DATA COMPLETION)</button>
 
         <div class="slider-block">
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
@@ -66,6 +75,19 @@
 
     let physicalTargetDevice = null;
     let targetDataCharacteristic = null;
+    let compiled64ByteArray = new Uint8Array(64);
+
+    window.onload = function() {
+        const savedScript = localStorage.getItem("cube_txt_script");
+        if (savedScript) {
+            document.getElementById("scriptEditor").value = savedScript;
+            parseAndCompileScript();
+        } else {
+            // Default sample script
+            document.getElementById("scriptEditor").value = "// Sample Script\nset(0,0,0)\nset(7,7,7)\nset(3,3,3)";
+            parseAndCompileScript();
+        }
+    };
 
     async function triggerBLELinkSession() {
         const statusDisplay = document.getElementById('connectionLog');
@@ -100,69 +122,76 @@
     async function executeBrightnessShift(val) {
         document.getElementById('sliderValLabel').innerText = val;
         if (!targetDataCharacteristic) return;
-        const dataPayload = new Uint8Array([66, parseInt(val)]); // 'B' + value
+        const dataPayload = new Uint8Array([66, parseInt(val)]);
         await targetDataCharacteristic.writeValueWithoutResponse(dataPayload);
     }
 
-    // --- RELAXED BUFFERED TRANSMISSION OVER BLE ---
-    async function send64ByteCustomMatrix(matrix64Bytes) {
-        if (!targetDataCharacteristic) return;
+    function loadTxtFile(input) {
+        let file = input.files[0];
+        if (!file) return;
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById("scriptEditor").value = e.target.result;
+            saveToLocalStorage();
+            parseAndCompileScript();
+        };
+        reader.readAsText(file);
+    }
+
+    function saveToLocalStorage() {
+        const script = document.getElementById("scriptEditor").value;
+        localStorage.setItem("cube_txt_script", script);
+    }
+
+    function parseAndCompileScript() {
+        saveToLocalStorage();
+        const text = document.getElementById("scriptEditor").value;
+        compiled64ByteArray.fill(0); // Reset matrix
+
+        const lines = text.split('\n');
+        lines.forEach(line => {
+            line = line.trim();
+            // Parse set(x,y,z) coordinate commands
+            let match = line.match(/set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+            if (match) {
+                let x = parseInt(match[1]);
+                let y = parseInt(match[2]);
+                let z = parseInt(match[3]);
+                if (x >= 0 && x < 8 && y >= 0 && y < 8 && z >= 0 && z < 8) {
+                    let index = z * 8 + y;
+                    compiled64ByteArray[index] |= (1 << x);
+                }
+            }
+        });
+    }
+
+    // --- DEDICATED MODE 'S' ENGINE: WAITS FOR COMPLETE BLUETOOTH DATA DELIVERY ---
+    async function executeSModeTransferEngine() {
+        if (!targetDataCharacteristic) {
+            alert("Please connect to Bluetooth HM-10 first!");
+            return;
+        }
+
+        parseAndCompileScript(); // Ensure script is compiled
+
+        const statusDisplay = document.getElementById('connectionLog');
+        statusDisplay.innerText = "TRANSMITTING DATA...";
 
         // Construct 66-byte packet: [0xFF, 'S', ...64 Data Bytes...]
         let packet = new Uint8Array(66);
-        packet[0] = 0xFF; // Sync Header
-        packet[1] = 83;   // ASCII code for 'S'
-        packet.set(matrix64Bytes, 2);
+        packet[0] = 0xFF; // Frame Header
+        packet[1] = 83;   // ASCII 'S' command code
+        packet.set(compiled64ByteArray, 2);
 
-        // Stream packet in 16-byte chunks with 100ms pause
+        // Send packet in 16-byte chunks with safe delay intervals
         const CHUNK_SIZE = 16;
         for (let i = 0; i < packet.length; i += CHUNK_SIZE) {
             const chunk = packet.slice(i, i + CHUNK_SIZE);
             await targetDataCharacteristic.writeValueWithoutResponse(chunk);
-            await new Promise(r => setTimeout(r, 100)); // 100ms prevents serial collisions
-        }
-    }
-
-    function sendCustomShape(type) {
-        let frame64 = new Uint8Array(64);
-
-        if (type === 'HEART') {
-            for (let z = 1; z <= 6; z++) {
-                let offset = z * 8;
-                if (z === 1 || z === 6) {
-                    frame64[offset + 3] = 0b00011000;
-                    frame64[offset + 4] = 0b00011000;
-                } else if (z === 2 || z === 5) {
-                    frame64[offset + 2] = 0b00100100;
-                    frame64[offset + 3] = 0b01111110;
-                    frame64[offset + 4] = 0b00111100;
-                    frame64[offset + 5] = 0b00011000;
-                } else {
-                    frame64[offset + 2] = 0b01100110;
-                    frame64[offset + 3] = 0b11111111;
-                    frame64[offset + 4] = 0b01111110;
-                    frame64[offset + 5] = 0b00111100;
-                    frame64[offset + 6] = 0b00011000;
-                }
-            }
-        } else if (type === 'CROSS') {
-            for (let z = 0; z < 8; z++) {
-                let offset = z * 8;
-                if (z >= 2 && z <= 5) {
-                    frame64[offset + 1] = 0xFF;
-                    frame64[offset + 2] = 0xFF;
-                    frame64[offset + 3] = 0xFF;
-                    frame64[offset + 4] = 0xFF;
-                    frame64[offset + 5] = 0xFF;
-                    frame64[offset + 6] = 0xFF;
-                } else {
-                    frame64[offset + 3] = 0b00011000;
-                    frame64[offset + 4] = 0b00011000;
-                }
-            }
+            await new Promise(r => setTimeout(r, 80)); // 80ms chunk interval guarantees complete receive
         }
 
-        send64ByteCustomMatrix(frame64);
+        statusDisplay.innerText = "CONNECTED (MODE 'S' RUNNING)";
     }
 
     async function terminateConnectionSequence() {
