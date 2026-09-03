@@ -1,380 +1,338 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>
+    8x8x8 LED Cube Console - Script Engine
+</title>
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+<style>
 
-    <title>
-        8x8x8 LED Cube Console - Script Engine
-    </title>
+:root {
+    --bg-color: #0b0f19;
+    --panel-bg: #151f32;
+    --text-color: #f1f5f9;
+    --text-muted: #94a3b8;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --success: #10b981;
+    --success-hover: #059669;
+    --warning: #f59e0b;
+    --warning-hover: #d97706;
+    --danger: #ef4444;
+    --danger-hover: #dc2626;
+    --border: #334155;
+}
 
-    <style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 
-        :root {
-            --bg-color: #0b0f19;
-            --panel-bg: #151f32;
-            --text-color: #f1f5f9;
-            --text-muted: #94a3b8;
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --success: #10b981;
-            --success-hover: #059669;
-            --warning: #f59e0b;
-            --warning-hover: #d97706;
-            --danger: #ef4444;
-            --danger-hover: #dc2626;
-            --border: #334155;
-        }
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+}
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
 
-            font-family:
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                Roboto,
-                Helvetica,
-                Arial,
-                sans-serif;
-        }
+    padding: 20px;
 
-        body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 
-            background-color:
-                var(--bg-color);
+    min-height: 100vh;
+}
 
-            color:
-                var(--text-color);
+.console-container {
+    background-color: var(--panel-bg);
 
-            padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
 
-            display: flex;
+    width: 100%;
+    max-width: 600px;
 
-            justify-content: center;
+    padding: 24px;
 
-            align-items: center;
+    box-shadow:
+        0 10px 25px -5px
+        rgba(0, 0, 0, 0.3);
+}
 
-            min-height: 100vh;
-        }
+h2 {
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+    text-align: center;
 
-        .console-container {
+    margin-bottom: 20px;
 
-            background-color:
-                var(--panel-bg);
+    color: #fff;
 
-            border:
-                1px solid var(--border);
+    border-bottom:
+        2px solid var(--border);
 
-            border-radius: 12px;
+    padding-bottom: 12px;
+}
 
-            width: 100%;
+h3 {
+    font-size: 1rem;
 
-            max-width: 600px;
+    color:
+        var(--text-muted);
 
-            padding: 24px;
+    margin-top: 24px;
+    margin-bottom: 12px;
 
-            box-shadow:
-                0 10px 25px -5px
-                rgba(0, 0, 0, 0.3);
-        }
+    letter-spacing: 0.5px;
+}
 
-        h2 {
+.status-panel {
+    background-color:
+        rgba(0, 0, 0, 0.2);
 
-            font-size: 1.5rem;
+    border:
+        1px solid var(--border);
 
-            letter-spacing: 1px;
+    padding: 12px;
 
-            text-align: center;
+    border-radius: 6px;
 
-            margin-bottom: 20px;
+    font-family: monospace;
 
-            color: #fff;
+    font-size: 0.9rem;
 
-            border-bottom:
-                2px solid var(--border);
+    text-align: center;
 
-            padding-bottom: 12px;
-        }
+    margin-bottom: 20px;
 
-        h3 {
+    color:
+        var(--warning);
+}
 
-            font-size: 1rem;
+.btn {
+    display: block;
 
-            color:
-                var(--text-muted);
+    width: 100%;
 
-            margin-top: 24px;
+    padding: 12px;
 
-            margin-bottom: 12px;
+    margin-bottom: 12px;
 
-            letter-spacing: 0.5px;
-        }
+    border: none;
 
-        .status-panel {
+    border-radius: 6px;
 
-            background-color:
-                rgba(0, 0, 0, 0.2);
+    font-size: 1rem;
+    font-weight: 600;
 
-            border:
-                1px solid var(--border);
+    cursor: pointer;
 
-            padding: 12px;
+    transition:
+        background-color 0.2s,
+        opacity 0.2s;
 
-            border-radius: 6px;
+    text-align: center;
+}
 
-            font-family: monospace;
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
 
-            font-size: 0.9rem;
+.btn-primary {
+    background-color:
+        var(--primary);
 
-            text-align: center;
+    color: white;
+}
 
-            margin-bottom: 20px;
+.btn-primary:hover:not(:disabled) {
+    background-color:
+        var(--primary-hover);
+}
 
-            color:
-                var(--warning);
-        }
+.btn-success {
+    background-color:
+        var(--success);
 
-        .btn {
+    color: white;
+}
 
-            display: block;
+.btn-success:hover:not(:disabled) {
+    background-color:
+        var(--success-hover);
+}
 
-            width: 100%;
+.btn-warning {
+    background-color:
+        var(--warning);
 
-            padding: 12px;
+    color: white;
+}
 
-            margin-bottom: 12px;
+.btn-warning:hover:not(:disabled) {
+    background-color:
+        var(--warning-hover);
+}
 
-            border: none;
+.btn-danger {
+    background-color:
+        var(--danger);
 
-            border-radius: 6px;
+    color: white;
+}
 
-            font-size: 1rem;
+.btn-danger:hover:not(:disabled) {
+    background-color:
+        var(--danger-hover);
+}
 
-            font-weight: 600;
+.btn-s-mode {
+    background-color:
+        #8b5cf6;
 
-            cursor: pointer;
+    color: white;
 
-            transition:
-                background-color 0.2s,
-                opacity 0.2s;
+    margin-top: 10px;
+}
 
-            text-align: center;
-        }
+.btn-s-mode:hover:not(:disabled) {
+    background-color:
+        #7c3aed;
+}
 
-        .btn:disabled {
+.control-group {
+    display: grid;
 
-            opacity: 0.4;
+    grid-template-columns:
+        1fr 1fr;
 
-            cursor: not-allowed;
-        }
+    gap: 12px;
+}
 
-        .btn-primary {
+.engine-panel {
+    border-top:
+        1px dashed var(--border);
 
-            background-color:
-                var(--primary);
+    margin-top: 20px;
 
-            color: white;
-        }
+    padding-top: 10px;
+}
 
-        .btn-primary:hover:not(:disabled) {
+textarea {
+    width: 100%;
 
-            background-color:
-                var(--primary-hover);
-        }
+    height: 150px;
 
-        .btn-success {
+    background-color:
+        rgba(0, 0, 0, 0.3);
 
-            background-color:
-                var(--success);
+    border:
+        1px solid var(--border);
 
-            color: white;
-        }
+    border-radius: 6px;
 
-        .btn-success:hover:not(:disabled) {
+    color: #51ff00;
 
-            background-color:
-                var(--success-hover);
-        }
+    font-family: monospace;
 
-        .btn-warning {
+    padding: 10px;
 
-            background-color:
-                var(--warning);
+    resize: vertical;
 
-            color: white;
-        }
+    margin-bottom: 12px;
 
-        .btn-warning:hover:not(:disabled) {
+    font-size: 0.85rem;
+}
 
-            background-color:
-                var(--warning-hover);
-        }
+.file-input-wrapper {
+    margin-bottom: 12px;
+}
 
-        .btn-danger {
+input[type="file"] {
+    display: none;
+}
 
-            background-color:
-                var(--danger);
+.file-label {
+    display: block;
 
-            color: white;
-        }
+    background-color:
+        #334155;
 
-        .btn-danger:hover:not(:disabled) {
+    color:
+        var(--text-color);
 
-            background-color:
-                var(--danger-hover);
-        }
+    padding: 10px;
 
-        .btn-s-mode {
+    text-align: center;
 
-            background-color:
-                #8b5cf6;
+    border-radius: 6px;
 
-            color: white;
+    cursor: pointer;
 
-            margin-top: 10px;
-        }
+    font-size: 0.9rem;
 
-        .btn-s-mode:hover:not(:disabled) {
+    border:
+        1px solid var(--border);
+}
 
-            background-color:
-                #7c3aed;
-        }
+.file-label:hover {
+    background-color:
+        #475569;
+}
 
-        .control-group {
+.range-container {
+    margin-top: 16px;
 
-            display: grid;
+    background-color:
+        rgba(0, 0, 0, 0.1);
 
-            grid-template-columns:
-                1fr 1fr;
+    padding: 12px;
 
-            gap: 12px;
-        }
+    border-radius: 6px;
 
-        .engine-panel {
+    border:
+        1px solid var(--border);
+}
 
-            border-top:
-                1px dashed var(--border);
+.range-label {
+    display: flex;
 
-            margin-top: 20px;
+    justify-content:
+        space-between;
 
-            padding-top: 10px;
-        }
+    font-size: 0.9rem;
 
-        textarea {
+    color:
+        var(--text-muted);
 
-            width: 100%;
+    margin-bottom: 6px;
+}
 
-            height: 150px;
+input[type="range"] {
+    width: 100%;
 
-            background-color:
-                rgba(0, 0, 0, 0.3);
+    accent-color:
+        var(--primary);
+}
 
-            border:
-                1px solid var(--border);
-
-            border-radius: 6px;
-
-            color: #51ff00;
-
-            font-family: monospace;
-
-            padding: 10px;
-
-            resize: vertical;
-
-            margin-bottom: 12px;
-
-            font-size: 0.85rem;
-        }
-
-        .file-input-wrapper {
-
-            margin-bottom: 12px;
-        }
-
-        input[type="file"] {
-
-            display: none;
-        }
-
-        .file-label {
-
-            display: block;
-
-            background-color:
-                #334155;
-
-            color:
-                var(--text-color);
-
-            padding: 10px;
-
-            text-align: center;
-
-            border-radius: 6px;
-
-            cursor: pointer;
-
-            font-size: 0.9rem;
-
-            border:
-                1px solid var(--border);
-        }
-
-        .file-label:hover {
-
-            background-color:
-                #475569;
-        }
-
-        .range-container {
-
-            margin-top: 16px;
-
-            background-color:
-                rgba(0, 0, 0, 0.1);
-
-            padding: 12px;
-
-            border-radius: 6px;
-
-            border:
-                1px solid var(--border);
-        }
-
-        .range-label {
-
-            display: flex;
-
-            justify-content:
-                space-between;
-
-            font-size: 0.9rem;
-
-            color:
-                var(--text-muted);
-
-            margin-bottom: 6px;
-        }
-
-        input[type="range"] {
-
-            width: 100%;
-
-            accent-color:
-                var(--primary);
-        }
-
-    </style>
+</style>
 
 </head>
 
@@ -382,171 +340,170 @@
 
 <div class="console-container">
 
-    <h2>
-        8x8x8 CUBE ADVANCED ENGINE
-    </h2>
+<h2>
+    8x8x8 CUBE ADVANCED ENGINE
+</h2>
 
-    <div
-        class="status-panel"
-        id="connectionLog"
-    >
-        INTERFACE STATUS: DISCONNECTED
-    </div>
+<div
+    class="status-panel"
+    id="connectionLog"
+>
+    INTERFACE STATUS: DISCONNECTED
+</div>
 
-    <button
-        class="btn btn-primary"
-        onclick="connectBLE()"
-    >
-        Pair HM-10 BLE Module
-    </button>
+<button
+    class="btn btn-primary"
+    onclick="connectBLE()"
+>
+    Pair HM-10 BLE Module
+</button>
 
-    <div class="control-group">
+<div class="control-group">
 
-        <button
-            class="btn btn-success"
-            onclick="transmitModeToken('A')"
-        >
-            Auto Mode ('A')
-        </button>
+<button
+    class="btn btn-success"
+    onclick="transmitModeToken('A')"
+>
+    Auto Mode ('A')
+</button>
 
-        <button
-            class="btn btn-warning"
-            onclick="transmitModeToken('M')"
-        >
-            Manual Mode ('M')
-        </button>
+<button
+    class="btn btn-warning"
+    onclick="transmitModeToken('M')"
+>
+    Manual Mode ('M')
+</button>
 
-    </div>
+</div>
 
-    <button
-        class="btn btn-primary"
-        onclick="transmitModeToken('N')"
-    >
-        Next Pattern Step ('N')
-    </button>
+<button
+    class="btn btn-primary"
+    onclick="transmitModeToken('N')"
+>
+    Next Pattern Step ('N')
+</button>
 
-    <button
-        class="btn btn-s-mode"
-        id="sModeButton"
-        onclick="enterSMode()"
-    >
-        S MODE
-    </button>
+<button
+    class="btn btn-s-mode"
+    onclick="enterSMode()"
+>
+    S MODE
+</button>
 
-    <div class="engine-panel">
+<div class="engine-panel">
 
-        <h3>
-            CUSTOM .TXT CODE ENGINE (MODE 'S')
-        </h3>
+<h3>
+    CUSTOM .TXT CODE ENGINE (MODE 'S')
+</h3>
 
-        <p
-            style="
-                font-size: 0.8rem;
-                color: var(--text-muted);
-                margin-bottom: 10px;
-            "
-        >
-            Upload a .txt script file or write XYZ code.
-            Script automatically saves to local browser storage.
-        </p>
+<p
+    style="
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+    "
+>
+    Use set(x,y,z), delay milliseconds, and next.
+    Each delay controls the time before the next frame.
+</p>
 
-        <div class="file-input-wrapper">
+<div class="file-input-wrapper">
 
-            <label
-                class="file-label"
-                for="txtFileInput"
-                id="fileInputLabel"
-            >
-                Choose Script File (.txt)
-            </label>
+<label
+    class="file-label"
+    for="txtFileInput"
+    id="fileInputLabel"
+>
+    Choose Script File (.txt)
+</label>
 
-            <input
-                type="file"
-                id="txtFileInput"
-                accept=".txt"
-                onchange="handleFileLoad(event)"
-            >
+<input
+    type="file"
+    id="txtFileInput"
+    accept=".txt"
+    onchange="handleFileLoad(event)"
+>
 
-        </div>
+</div>
 
-        <textarea
-            id="scriptIDE"
-            placeholder="// Enter your animation commands here...&#10;set(0,0,0)&#10;set(7,7,7)&#10;delay 250&#10;set(1,1,1)&#10;delay 250"
-        ></textarea>
+<textarea
+    id="scriptIDE"
+    placeholder="// Example&#10;set(3,3,0)&#10;delay 100&#10;set(3,3,1)&#10;delay 100"
+></textarea>
 
-        <div class="control-group">
+<div class="control-group">
 
-            <button
-                class="btn btn-primary"
-                style="background-color: #475569;"
-                onclick="saveToStorage()"
-            >
-                Save Script to Storage
-            </button>
+<button
+    class="btn btn-primary"
+    style="background-color:#475569;"
+    onclick="saveToStorage()"
+>
+    Save Script to Storage
+</button>
 
-            <button
-                class="btn btn-primary"
-                style="background-color: #475569;"
-                onclick="parseAndCompileScript()"
-            >
-                Compile Code Engine
-            </button>
+<button
+    class="btn btn-primary"
+    style="background-color:#475569;"
+    onclick="parseAndCompileScript()"
+>
+    Compile Code Engine
+</button>
 
-        </div>
+</div>
 
-        <button
-            class="btn btn-s-mode"
-            id="runScriptButton"
-            onclick="executeSModeTransferEngine()"
-            disabled
-        >
-            DRAW / RUN CUSTOM SCRIPT
-        </button>
+<button
+    class="btn btn-s-mode"
+    id="runScriptButton"
+    onclick="executeSModeTransferEngine()"
+    disabled
+>
+    DRAW / RUN CUSTOM SCRIPT
+</button>
 
-    </div>
+</div>
 
-    <div class="range-container">
+<div class="range-container">
 
-        <div class="range-label">
+<div class="range-label">
 
-            <span>
-                BRIGHTNESS CONTROL:
-            </span>
+<span>
+    BRIGHTNESS CONTROL:
+</span>
 
-            <span id="brightnessVal">
-                5
-            </span>
+<span id="brightnessVal">
+    5
+</span>
 
-        </div>
+</div>
 
-        <input
-            type="range"
-            id="brightnessRange"
-            min="2"
-            max="8"
-            value="5"
-            oninput="updateBrightness(this.value)"
-        >
+<input
+    type="range"
+    id="brightnessRange"
+    min="2"
+    max="8"
+    value="5"
+    oninput="updateBrightness(this.value)"
+>
 
-    </div>
+</div>
 
-    <button
-        class="btn btn-danger"
-        style="
-            margin-top: 20px;
-            margin-bottom: 0;
-        "
-        onclick="disconnectBLE()"
-    >
-        Disconnect Session
-    </button>
+<button
+    class="btn btn-danger"
+    style="
+        margin-top:20px;
+        margin-bottom:0;
+    "
+    onclick="disconnectBLE()"
+>
+    Disconnect Session
+</button>
 
 </div>
 
 <script>
 
 // ============================================================
-// BLE VARIABLES
+// BLE
 // ============================================================
 
 let targetDevice = null;
@@ -560,29 +517,31 @@ const HM10_CHARACTERISTIC_UUID =
     "0000ffe1-0000-1000-8000-00805f9b34fb";
 
 // ============================================================
-// SCRIPT VARIABLES
+// SCRIPT
 // ============================================================
 
 let scriptFrames = [];
+
+// Each item:
+//
+// {
+//     bytes: Uint8Array(64),
+//     delay: number
+// }
 
 let scriptPlaybackRunning = false;
 
 let scriptPlaybackToken = 0;
 
 // ============================================================
-// SINGLE SERIAL BLE WRITE QUEUE
+// BLE QUEUE
 // ============================================================
 
-let bleWriteQueue = Promise.resolve();
+let bleWriteQueue =
+    Promise.resolve();
 
 // ============================================================
-// WEBPAGE MODE
-// ============================================================
-//
-// NONE = connected but no webpage-selected mode
-// A    = Auto
-// M    = Manual
-// S    = Script
+// WEB MODE
 // ============================================================
 
 let webCubeMode = "NONE";
@@ -622,16 +581,13 @@ window.addEventListener(
 
             document.getElementById(
                 "scriptIDE"
-            ).value = cachedScript;
+            ).value =
+                cachedScript;
         }
 
         updateSModeUI();
     }
 );
-
-// ============================================================
-// SAVE SCRIPT
-// ============================================================
 
 function saveToStorage() {
 
@@ -650,13 +606,10 @@ function saveToStorage() {
     );
 }
 
-// ============================================================
-// LOAD TXT
-// ============================================================
-
 function handleFileLoad(event) {
 
-    const input = event.target;
+    const input =
+        event.target;
 
     if (
         !input.files ||
@@ -676,34 +629,68 @@ function handleFileLoad(event) {
     const reader =
         new FileReader();
 
-    reader.onload = function() {
+    reader.onload =
+        function() {
 
-        document.getElementById(
-            "scriptIDE"
-        ).value =
-            reader.result;
+            document.getElementById(
+                "scriptIDE"
+            ).value =
+                reader.result;
 
-        localStorage.setItem(
-            "cube_cached_script",
-            reader.result
-        );
-    };
+            localStorage.setItem(
+                "cube_cached_script",
+                reader.result
+            );
+        };
 
     reader.readAsText(file);
 }
 
 // ============================================================
-// SCRIPT COMPILER
+// DELAY PARSER
 // ============================================================
 //
-// Supported commands remain:
-// set(x,y,z)
-// delay ...
-// next
+// Supports:
 //
-// The existing parser uses delay/next only as frame
-// separators. Timing remains controlled by the webpage's
-// 250 ms playback interval.
+// delay 100
+// delay 250
+// delay(100)
+//
+// "next" also ends the current frame.
+//
+// IMPORTANT:
+// The number is now actually used.
+// ============================================================
+
+function parseDelayCommand(line) {
+
+    let match =
+        line.match(
+            /^delay\s*(?:\(\s*)?(\d+)(?:\s*\))?\s*$/i
+        );
+
+    if (!match) {
+        return null;
+    }
+
+    let value =
+        parseInt(
+            match[1],
+            10
+        );
+
+    if (!Number.isFinite(value)) {
+        return null;
+    }
+
+    return Math.max(
+        0,
+        value
+    );
+}
+
+// ============================================================
+// SCRIPT COMPILER
 // ============================================================
 
 function parseAndCompileScript() {
@@ -716,118 +703,169 @@ function parseAndCompileScript() {
         ).value;
 
     const lines =
-        rawText.split("\n");
+        rawText.split(/\r?\n/);
 
     let currentFrameBytes =
         new Uint8Array(64);
 
-    let hasDataInCurrentFrame =
+    let hasData =
         false;
 
-    for (let line of lines) {
+    // Default only when a frame has no explicit delay.
+    const DEFAULT_FRAME_DELAY = 250;
 
-        line = line.trim();
+    for (
+        let line of lines
+    ) {
+
+        line =
+            line.trim();
 
         if (
+            line.length === 0 ||
             line.startsWith("//") ||
-            line.startsWith("#") ||
-            line.length === 0
+            line.startsWith("#")
         ) {
             continue;
         }
 
-        if (
-            line
-                .toLowerCase()
-                .startsWith("delay") ||
+        // ----------------------------------------------------
+        // DELAY
+        // ----------------------------------------------------
 
-            line.toLowerCase() === "next"
-        ) {
+        const delayValue =
+            parseDelayCommand(line);
 
-            if (hasDataInCurrentFrame) {
+        if (delayValue !== null) {
 
-                scriptFrames.push(
-                    new Uint8Array(
-                        currentFrameBytes
-                    )
-                );
+            if (hasData) {
+
+                scriptFrames.push({
+                    bytes:
+                        new Uint8Array(
+                            currentFrameBytes
+                        ),
+                    delay:
+                        delayValue
+                });
 
                 currentFrameBytes =
                     new Uint8Array(64);
 
-                hasDataInCurrentFrame =
-                    false;
+                hasData = false;
             }
 
             continue;
         }
+
+        // ----------------------------------------------------
+        // NEXT
+        // ----------------------------------------------------
+
+        if (
+            line.toLowerCase() ===
+            "next"
+        ) {
+
+            if (hasData) {
+
+                scriptFrames.push({
+                    bytes:
+                        new Uint8Array(
+                            currentFrameBytes
+                        ),
+                    delay:
+                        DEFAULT_FRAME_DELAY
+                });
+
+                currentFrameBytes =
+                    new Uint8Array(64);
+
+                hasData = false;
+            }
+
+            continue;
+        }
+
+        // ----------------------------------------------------
+        // SET
+        // ----------------------------------------------------
 
         const match =
             line.match(
                 /set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i
             );
 
-        if (match) {
-
-            const x =
-                parseInt(
-                    match[1],
-                    10
-                );
-
-            const y =
-                parseInt(
-                    match[2],
-                    10
-                );
-
-            const z =
-                parseInt(
-                    match[3],
-                    10
-                );
-
-            if (
-                x >= 0 && x < 8 &&
-                y >= 0 && y < 8 &&
-                z >= 0 && z < 8
-            ) {
-
-                hasDataInCurrentFrame =
-                    true;
-
-                const byteIndex =
-                    (z * 8) + y;
-
-                const bitIndex =
-                    x;
-
-                currentFrameBytes[
-                    byteIndex
-                ] |= (
-                    1 << bitIndex
-                );
-            }
+        if (!match) {
+            continue;
         }
+
+        const x =
+            parseInt(
+                match[1],
+                10
+            );
+
+        const y =
+            parseInt(
+                match[2],
+                10
+            );
+
+        const z =
+            parseInt(
+                match[3],
+                10
+            );
+
+        if (
+            x < 0 || x >= 8 ||
+            y < 0 || y >= 8 ||
+            z < 0 || z >= 8
+        ) {
+            continue;
+        }
+
+        const byteIndex =
+            (z * 8) + y;
+
+        const bitIndex =
+            x;
+
+        currentFrameBytes[
+            byteIndex
+        ] |=
+            (1 << bitIndex);
+
+        hasData = true;
     }
 
-    if (hasDataInCurrentFrame) {
+    // --------------------------------------------------------
+    // FINAL FRAME
+    // --------------------------------------------------------
 
-        scriptFrames.push(
-            new Uint8Array(
-                currentFrameBytes
-            )
-        );
+    if (hasData) {
+
+        scriptFrames.push({
+            bytes:
+                new Uint8Array(
+                    currentFrameBytes
+                ),
+
+            delay:
+                DEFAULT_FRAME_DELAY
+        });
     }
 
     console.log(
-        "Compiled script frames:",
-        scriptFrames.length
+        "Compiled script:",
+        scriptFrames.length,
+        "frames"
     );
 }
 
 // ============================================================
-// CONNECT BLE
+// CONNECT
 // ============================================================
 
 async function connectBLE() {
@@ -847,7 +885,6 @@ async function connectBLE() {
 
         targetDevice =
             await navigator.bluetooth.requestDevice({
-
                 filters: [
                     {
                         services: [
@@ -935,7 +972,7 @@ async function connectBLE() {
 }
 
 // ============================================================
-// DISCONNECTED
+// DISCONNECT
 // ============================================================
 
 function onDisconnected() {
@@ -964,10 +1001,6 @@ function onDisconnected() {
     logDisplay.style.color =
         "var(--warning)";
 }
-
-// ============================================================
-// MANUAL DISCONNECT
-// ============================================================
 
 function disconnectBLE() {
 
@@ -1007,15 +1040,7 @@ function disconnectBLE() {
 }
 
 // ============================================================
-// BLE WRITE QUEUE
-// ============================================================
-//
-// Important:
-// A rejected previous queue entry must NOT permanently
-// poison the queue. Every new write starts by recovering
-// from any previous rejected write.
-//
-// Each actual GATT write is still performed one at a time.
+// QUEUED SINGLE BLE WRITE
 // ============================================================
 
 function queueBLEWrite(
@@ -1114,18 +1139,13 @@ function queueBLEWrite(
 // ============================================================
 // BRIGHTNESS
 // ============================================================
-//
-// Arduino expects:
-// B + value
-//
-// Both bytes are sent in ONE queued GATT write.
-// ============================================================
 
 async function updateBrightness(val) {
 
     document.getElementById(
         "brightnessVal"
-    ).innerText = val;
+    ).innerText =
+        val;
 
     const value =
         parseInt(
@@ -1133,22 +1153,22 @@ async function updateBrightness(val) {
             10
         );
 
-    const brightnessPacket =
+    const packet =
         new Uint8Array([
-            0x42, // ASCII B
+            0x42,
             value
         ]);
 
     try {
 
         await queueBLEWrite(
-            brightnessPacket
+            packet
         );
 
     } catch (error) {
 
         console.error(
-            "Brightness transmission:",
+            "Brightness:",
             error
         );
     }
@@ -1166,34 +1186,22 @@ async function transmitModeToken(
         return;
     }
 
+    scriptPlaybackRunning =
+        false;
+
+    scriptPlaybackToken++;
+
     if (
         tokenChar === "A" ||
-        tokenChar === "M" ||
-        tokenChar === "N" ||
-        tokenChar === "Q"
+        tokenChar === "M"
     ) {
 
-        scriptPlaybackRunning =
-            false;
-
-        scriptPlaybackToken++;
-    }
-
-    // --------------------------------------------------------
-    // WEBPAGE MODE
-    // --------------------------------------------------------
-
-    if (tokenChar === "A") {
-
         webCubeMode =
-            "A";
+            tokenChar;
 
-    } else if (tokenChar === "M") {
-
-        webCubeMode =
-            "M";
-
-    } else if (tokenChar === "Q") {
+    } else if (
+        tokenChar === "Q"
+    ) {
 
         webCubeMode =
             "A";
@@ -1201,21 +1209,18 @@ async function transmitModeToken(
 
     updateSModeUI();
 
-    const buffer =
-        new TextEncoder().encode(
-            tokenChar
-        );
-
     try {
 
         await queueBLEWrite(
-            buffer
+            new TextEncoder().encode(
+                tokenChar
+            )
         );
 
     } catch (error) {
 
         console.error(
-            "Mode transmission:",
+            "Mode command:",
             error
         );
     }
@@ -1223,17 +1228,6 @@ async function transmitModeToken(
 
 // ============================================================
 // ENTER S MODE
-// ============================================================
-//
-// Sends exactly:
-//
-// ASCII 'S'
-//
-// Arduino receives S and immediately:
-// 1. enters mode 2
-// 2. stops built-in animation
-// 3. clears cube
-// 4. waits for frames
 // ============================================================
 
 async function enterSMode() {
@@ -1247,46 +1241,40 @@ async function enterSMode() {
         return;
     }
 
-    // Stop any previous script loop.
     scriptPlaybackRunning =
         false;
 
     scriptPlaybackToken++;
 
-    // Mark webpage as S mode.
     webCubeMode =
         "S";
 
     updateSModeUI();
 
-    const sModeCommand =
-        new Uint8Array([
-            0x53 // ASCII 'S'
-        ]);
-
-    const logDisplay =
+    const statusDisplay =
         document.getElementById(
             "connectionLog"
         );
 
     try {
 
+        // EXACT S MODE COMMAND:
+        // ASCII 53 hex
         await queueBLEWrite(
-            sModeCommand
+            new Uint8Array([
+                0x53
+            ])
         );
-
-        // Only after S command successfully enters
-        // the queue do we report S ready.
 
         if (
             webCubeMode === "S" &&
             targetDataCharacteristic
         ) {
 
-            logDisplay.innerText =
+            statusDisplay.innerText =
                 "CONNECTED (S MODE / READY)";
 
-            logDisplay.style.color =
+            statusDisplay.style.color =
                 "#8b5cf6";
         }
 
@@ -1297,10 +1285,10 @@ async function enterSMode() {
 
         updateSModeUI();
 
-        logDisplay.innerText =
+        statusDisplay.innerText =
             "S MODE ENTRY FAILED";
 
-        logDisplay.style.color =
+        statusDisplay.style.color =
             "var(--danger)";
 
         alert(
@@ -1314,20 +1302,18 @@ async function enterSMode() {
 // SEND ONE SCRIPT FRAME
 // ============================================================
 //
-// Full logical packet:
+// Logical packet:
 //
-// FF 53 + 64 frame bytes
+// FF 53 + 64 bytes
 //
-// 66 bytes total.
+// Physical BLE writes:
 //
-// BLE HM-10 write limit:
-// 20 bytes.
+// 20 bytes
+// 20 bytes
+// 20 bytes
+//  6 bytes
 //
-// Therefore split into:
-// 20
-// 20
-// 20
-// 6
+// Arduino keeps its parser state between writes.
 // ============================================================
 
 async function sendSingleScriptFrame(
@@ -1342,7 +1328,7 @@ async function sendSingleScriptFrame(
         0xFF;
 
     packet[1] =
-        0x53; // ASCII S
+        0x53;
 
     packet.set(
         frameBytes,
@@ -1385,10 +1371,7 @@ async function sendSingleScriptFrame(
 }
 
 // ============================================================
-// RUN SCRIPT
-// ============================================================
-//
-// Can ONLY execute in S mode.
+// SCRIPT PLAYBACK
 // ============================================================
 
 async function executeSModeTransferEngine() {
@@ -1411,7 +1394,6 @@ async function executeSModeTransferEngine() {
         return;
     }
 
-    // Stop a previous script loop.
     scriptPlaybackRunning =
         false;
 
@@ -1420,8 +1402,6 @@ async function executeSModeTransferEngine() {
     const myToken =
         scriptPlaybackToken;
 
-    // Wait for all writes already queued before compiling
-    // and starting the frame loop.
     await bleWriteQueue.catch(
         () => {}
     );
@@ -1490,10 +1470,13 @@ async function executeSModeTransferEngine() {
                     break;
                 }
 
-                await sendSingleScriptFrame(
+                const frame =
                     scriptFrames[
                         frameIndex
-                    ],
+                    ];
+
+                await sendSingleScriptFrame(
+                    frame.bytes,
                     myToken
                 );
 
@@ -1507,12 +1490,14 @@ async function executeSModeTransferEngine() {
                     break;
                 }
 
-                // Existing playback timing.
+                // THIS IS NOW THE SCRIPT'S
+                // ACTUAL DELAY VALUE.
+
                 await new Promise(
                     resolve =>
                         setTimeout(
                             resolve,
-                            250
+                            frame.delay
                         )
                 );
             }
