@@ -7,6 +7,7 @@ const HM10_CHARACTERISTIC_UUID="0000ffe1-0000-1000-8000-00805f9b34fb";
 let scriptFrames=[],scriptPlaybackRunning=false,scriptPlaybackToken=0;
 let bleWriteQueue=Promise.resolve();
 let webCubeMode="NONE";
+let scriptFrameId=0;
 
 function updateSModeUI(){
   document.getElementById("runScriptButton").disabled=(webCubeMode!=="S"||!targetDataCharacteristic);
@@ -33,6 +34,8 @@ function handleFileLoad(event){
   reader.onload=()=>{
     document.getElementById("scriptIDE").value=reader.result;
     localStorage.setItem("cube_cached_script",reader.result);
+    const count=parseAndCompileScript();
+    document.getElementById("connectionLog").innerText="SCRIPT LOADED: "+count+" FRAME(S)";
   };
   reader.readAsText(file);
 }
@@ -108,7 +111,8 @@ function parseAndCompileScript(){
   }
 
   if(hasCommands)pushFrame();
-  console.log("Compiled 512-bit frames:",scriptFrames.length);
+  document.getElementById("runScriptButton").disabled=!(webCubeMode==="S"&&targetDataCharacteristic&&scriptFrames.length);
+  console.log("Compiled 512-bit frames:",scriptFrames.length,"(64 bytes/frame)");
   return scriptFrames.length;
 }
 
@@ -204,17 +208,19 @@ function queueBLEWrite(data,token=null){
 
 async function updateBrightness(val){
   document.getElementById("brightnessVal").innerText=val;
+  // Never inject a brightness command into the binary S-mode frame stream.
+  if(webCubeMode==="S")return;
   try{
     await queueBLEWrite(new Uint8Array([0x42,parseInt(val,10)]));
   }catch(e){
     console.error("Brightness transmission:",e);
   }
 }
-
 async function transmitModeToken(c){
   if(!targetDataCharacteristic)return;
-
   if(c==="N"&&webCubeMode!=="M")return;
+
+  const leavingS=(webCubeMode==="S"&&(c==="A"||c==="M"||c==="Q"));
 
   if(c==="A"||c==="M"||c==="Q"){
     scriptPlaybackRunning=false;
@@ -228,12 +234,16 @@ async function transmitModeToken(c){
   updateSModeUI();
 
   try{
-    await queueBLEWrite(new TextEncoder().encode(c));
+    // Let the Arduino's S receiver discard any incomplete 64-byte frame
+    // before the new mode command arrives.
+    if(leavingS)await new Promise(r=>setTimeout(r,150));
+
+    const cmd=(c==="A"?0x41:c==="M"?0x4D:0x51);
+    await queueBLEWrite(new Uint8Array([0xFF,cmd,0x00]));
   }catch(e){
     console.error("Mode command:",e);
   }
 }
-
 async function enterSMode(){
   if(!targetDataCharacteristic){
     alert("Please connect to Bluetooth HM-10 first!");
@@ -248,7 +258,8 @@ async function enterSMode(){
   const log=document.getElementById("connectionLog");
 
   try{
-    await queueBLEWrite(new Uint8Array([0x53]));
+    await bleWriteQueue.catch(()=>{});
+    await queueBLEWrite(new Uint8Array([0xFF,0x53,0x00]));
     if(targetDataCharacteristic&&webCubeMode==="S"){
       log.innerText="CONNECTED (S MODE / READY)";
       log.style.color="#8b5cf6";
@@ -261,13 +272,16 @@ async function enterSMode(){
     alert("S-Mode entry failed: "+e.message);
   }
 }
-
 async function sendSingleScriptFrame(frameBytes,token){
   // One frame is ALWAYS exactly 64 bytes = 512 LED bits.
   // BLE writes are exactly 3 bytes each, except the final write which is 1 byte.
   if(!(frameBytes instanceof Uint8Array)||frameBytes.length!==64){
     throw new Error("S frame must contain exactly 64 bytes (512 bits)");
   }
+
+  // Frame header is also one 3-byte BLE write: FF 46 frameId.
+  await queueBLEWrite(new Uint8Array([0xFF,0x46,scriptFrameId&0xFF]),token);
+  scriptFrameId=(scriptFrameId+1)&0xFF;
 
   const CHUNK_SIZE=3;
   for(let offset=0;offset<frameBytes.length;offset+=CHUNK_SIZE){
