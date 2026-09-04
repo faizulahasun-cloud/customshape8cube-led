@@ -47,65 +47,68 @@ function parseDelayCommand(line){
 function parseAndCompileScript(){
   scriptFrames=[];
   const lines=document.getElementById("scriptIDE").value.split(/\r?\n/);
-  let bytes=new Uint8Array(64);
-  let hasData=false;
+  let frameBytes=new Uint8Array(64);
   let frameOpen=false;
+  let hasCommands=false;
   let pendingDelay=null;
   const defaultDelay=250;
 
-  function pushFrame(){
-    if(!hasData) return;
-    scriptFrames.push({bytes:new Uint8Array(bytes),delay:(pendingDelay===null?defaultDelay:pendingDelay)});
-    bytes=new Uint8Array(64);
-    hasData=false;
+  function pushFrame(force=false){
+    if(!hasCommands&&!force)return;
+    scriptFrames.push({bytes:frameBytes.slice(),delay:(pendingDelay===null?defaultDelay:pendingDelay)});
+    frameBytes=new Uint8Array(64);
     pendingDelay=null;
+    hasCommands=false;
     frameOpen=false;
   }
 
   for(let line of lines){
     line=line.trim();
-    if(!line||line.startsWith("//")||line.startsWith("#")) continue;
+    if(!line||line.startsWith("//")||line.startsWith("#"))continue;
 
-    if(line.toUpperCase()==="FRAME_START"){
-      if(hasData) pushFrame();
+    const upper=line.toUpperCase();
+    if(upper==="FRAME_START"){
+      if(hasCommands)pushFrame();
       frameOpen=true;
-      bytes=new Uint8Array(64);
-      hasData=false;
+      frameBytes=new Uint8Array(64);
+      hasCommands=false;
       pendingDelay=null;
       continue;
     }
 
-    if(line.toUpperCase()==="FRAME_END"){
-      pushFrame();
+    if(upper==="FRAME_END"){
+      pushFrame(true);
       continue;
     }
 
     const delay=parseDelayCommand(line);
     if(delay!==null){
       pendingDelay=delay;
-      // Without explicit FRAME_END, delay also closes the current frame.
-      if(hasData&&!frameOpen) pushFrame();
+      if(hasCommands&&!frameOpen)pushFrame();
       continue;
     }
 
-    if(line.toLowerCase()==="next"){
-      if(hasData) pushFrame();
+    if(upper==="NEXT"){
+      if(hasCommands)pushFrame();
+      else if(frameOpen)pushFrame(true);
       continue;
     }
 
     const m=line.match(/set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-    if(!m) continue;
+    if(!m)continue;
 
     const x=parseInt(m[1],10),y=parseInt(m[2],10),z=parseInt(m[3],10);
-    if(x<0||x>=8||y<0||y>=8||z<0||z>=8) continue;
+    if(x<0||x>=8||y<0||y>=8||z<0||z>=8)continue;
 
-    bytes[z*8+y]|=(1<<x);
-    hasData=true;
+    const index=z*64+y*8+x;
+    const byteIndex=index>>3;
+    const bitIndex=index&7;
+    frameBytes[byteIndex]|=(1<<bitIndex);
+    hasCommands=true;
   }
 
-  if(hasData) pushFrame();
-
-  console.log("Compiled frames:",scriptFrames.length);
+  if(hasCommands)pushFrame();
+  console.log("Compiled 512-bit frames:",scriptFrames.length);
   return scriptFrames.length;
 }
 
@@ -260,63 +263,50 @@ async function enterSMode(){
 }
 
 async function sendSingleScriptFrame(frameBytes,token){
-  // Logical frame:
-  // FF 53 40 + 64 bytes + XOR checksum + EE
-  // 69 bytes total.
-
-  const packet=new Uint8Array(69);
-  packet[0]=0xFF;
-  packet[1]=0x53;
-  packet[2]=0x40;
-  packet.set(frameBytes,3);
-
-  let checksum=0;
-  for(let i=0;i<64;i++)checksum^=frameBytes[i];
-
-  packet[67]=checksum;
-  packet[68]=0xEE;
-
-  const CHUNK_SIZE=20;
-
-  for(let offset=0;offset<packet.length;offset+=CHUNK_SIZE){
-    if(!scriptPlaybackRunning||token!==scriptPlaybackToken||webCubeMode!=="S")return false;
-
-    const chunk=packet.slice(
-      offset,
-      Math.min(offset+CHUNK_SIZE,packet.length)
-    );
-
-    await queueBLEWrite(chunk,token);
+  // One frame is ALWAYS exactly 64 bytes = 512 LED bits.
+  // BLE writes are exactly 3 bytes each, except the final write which is 1 byte.
+  if(!(frameBytes instanceof Uint8Array)||frameBytes.length!==64){
+    throw new Error("S frame must contain exactly 64 bytes (512 bits)");
   }
 
+  const CHUNK_SIZE=3;
+  for(let offset=0;offset<frameBytes.length;offset+=CHUNK_SIZE){
+    if(!scriptPlaybackRunning||token!==scriptPlaybackToken||webCubeMode!=="S")return false;
+    const chunk=frameBytes.slice(offset,Math.min(offset+CHUNK_SIZE,frameBytes.length));
+    await queueBLEWrite(chunk,token);
+  }
   return true;
 }
 
 async function sendSFrame(frameBytes){
-  if(!targetDataCharacteristic||webCubeMode!=="S") return false;
-  if(!(frameBytes instanceof Uint8Array)||frameBytes.length!==64) throw new Error("S frame must be 64 bytes");
-  const token=scriptPlaybackToken;
-  const packet=new Uint8Array(69); packet[0]=0xFF; packet[1]=0x53; packet[2]=0x40; packet.set(frameBytes,3);
-  let checksum=0; for(let i=0;i<64;i++) checksum^=frameBytes[i];
-  packet[67]=checksum; packet[68]=0xEE;
-  for(let off=0;off<69;off+=20){
-    if(token!==scriptPlaybackToken||webCubeMode!=="S") return false;
-    await queueBLEWrite(packet.slice(off,Math.min(off+20,69)),token);
+  if(!targetDataCharacteristic||webCubeMode!=="S")return false;
+  if(Array.isArray(frameBytes))frameBytes=Uint8Array.from(frameBytes);
+  if(!(frameBytes instanceof Uint8Array)||frameBytes.length!==64){
+    throw new Error("S frame must contain exactly 64 bytes (512 bits)");
   }
-  return true;
+  const oldRunning=scriptPlaybackRunning;
+  const oldToken=scriptPlaybackToken;
+  scriptPlaybackRunning=true;
+  const ok=await sendSingleScriptFrame(frameBytes,oldToken);
+  if(!oldRunning)scriptPlaybackRunning=false;
+  return ok;
 }
 window.sendSFrame=sendSFrame;
 
 async function playSAnimation(frames,delays=250){
-  if(!targetDataCharacteristic||webCubeMode!=="S"||!Array.isArray(frames)||!frames.length) return false;
-  scriptPlaybackRunning=false; scriptPlaybackToken++;
-  const token=scriptPlaybackToken; scriptPlaybackRunning=true;
+  if(!targetDataCharacteristic||webCubeMode!=="S"||!Array.isArray(frames)||!frames.length)return false;
+  scriptPlaybackRunning=false;
+  scriptPlaybackToken++;
+  const token=scriptPlaybackToken;
+  scriptPlaybackRunning=true;
   try{
     while(scriptPlaybackRunning&&token===scriptPlaybackToken&&webCubeMode==="S"){
       for(let i=0;i<frames.length;i++){
-        if(!scriptPlaybackRunning||token!==scriptPlaybackToken||webCubeMode!=="S") break;
-        const f=frames[i];
-        const ok=await sendSFrame(f); if(!ok) return false;
+        if(!scriptPlaybackRunning||token!==scriptPlaybackToken||webCubeMode!=="S")break;
+        let frame=frames[i];
+        if(Array.isArray(frame))frame=Uint8Array.from(frame);
+        if(!(frame instanceof Uint8Array)||frame.length!==64)throw new Error("Every S animation frame must be 64 bytes");
+        if(!(await sendSingleScriptFrame(frame,token)))return false;
         const d=Array.isArray(delays)?Math.max(0,Number(delays[i]??250)):Math.max(0,Number(delays));
         await new Promise(r=>setTimeout(r,d));
       }
