@@ -292,6 +292,40 @@ async function sendSingleScriptFrame(frameBytes,token){
   return true;
 }
 
+async function sendSFrame(frameBytes){
+  if(!targetDataCharacteristic||webCubeMode!=="S") return false;
+  if(!(frameBytes instanceof Uint8Array)||frameBytes.length!==64) throw new Error("S frame must be 64 bytes");
+  const token=scriptPlaybackToken;
+  const packet=new Uint8Array(69); packet[0]=0xFF; packet[1]=0x53; packet[2]=0x40; packet.set(frameBytes,3);
+  let checksum=0; for(let i=0;i<64;i++) checksum^=frameBytes[i];
+  packet[67]=checksum; packet[68]=0xEE;
+  for(let off=0;off<69;off+=20){
+    if(token!==scriptPlaybackToken||webCubeMode!=="S") return false;
+    await queueBLEWrite(packet.slice(off,Math.min(off+20,69)),token);
+  }
+  return true;
+}
+window.sendSFrame=sendSFrame;
+
+async function playSAnimation(frames,delays=250){
+  if(!targetDataCharacteristic||webCubeMode!=="S"||!Array.isArray(frames)||!frames.length) return false;
+  scriptPlaybackRunning=false; scriptPlaybackToken++;
+  const token=scriptPlaybackToken; scriptPlaybackRunning=true;
+  try{
+    while(scriptPlaybackRunning&&token===scriptPlaybackToken&&webCubeMode==="S"){
+      for(let i=0;i<frames.length;i++){
+        if(!scriptPlaybackRunning||token!==scriptPlaybackToken||webCubeMode!=="S") break;
+        const f=frames[i];
+        const ok=await sendSFrame(f); if(!ok) return false;
+        const d=Array.isArray(delays)?Math.max(0,Number(delays[i]??250)):Math.max(0,Number(delays));
+        await new Promise(r=>setTimeout(r,d));
+      }
+    }
+  }finally{if(token===scriptPlaybackToken)scriptPlaybackRunning=false;}
+  return true;
+}
+window.playSAnimation=playSAnimation;
+
 async function executeSModeTransferEngine(){
   if(!targetDataCharacteristic){
     alert("Please connect to Bluetooth HM-10 first!");
