@@ -3,32 +3,60 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>8x8x8 LED Cube Console - Script Engine</title>
+<title>8x8x8 LED Cube Console - Layer Stream Engine</title>
 <style>
 :root{--bg-color:#0b0f19;--panel-bg:#151f32;--text-color:#f1f5f9;--text-muted:#94a3b8;--primary:#2563eb;--primary-hover:#1d4ed8;--success:#10b981;--success-hover:#059669;--warning:#f59e0b;--warning-hover:#d97706;--danger:#ef4444;--danger-hover:#dc2626;--border:#334155}*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}body{background:var(--bg-color);color:var(--text-color);padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh}.console-container{background:var(--panel-bg);border:1px solid var(--border);border-radius:12px;width:100%;max-width:600px;padding:24px;box-shadow:0 10px 25px -5px rgba(0,0,0,.3)}h2{font-size:1.5rem;letter-spacing:1px;text-align:center;margin-bottom:20px;color:#fff;border-bottom:2px solid var(--border);padding-bottom:12px}h3{font-size:1rem;color:var(--text-muted);margin-top:24px;margin-bottom:12px;letter-spacing:.5px}.status-panel{background:rgba(0,0,0,.2);border:1px solid var(--border);padding:12px;border-radius:6px;font-family:monospace;font-size:.9rem;text-align:center;margin-bottom:20px;color:var(--warning)}.btn{display:block;width:100%;padding:12px;margin-bottom:12px;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;transition:background-color .2s,opacity .2s;text-align:center}.btn:disabled{opacity:.4;cursor:not-allowed}.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover:not(:disabled){background:var(--primary-hover)}.btn-success{background:var(--success);color:#fff}.btn-success:hover:not(:disabled){background:var(--success-hover)}.btn-warning{background:var(--warning);color:#fff}.btn-warning:hover:not(:disabled){background:var(--warning-hover)}.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover:not(:disabled){background:var(--danger-hover)}.btn-s-mode{background:#8b5cf6;color:#fff;margin-top:10px}.btn-s-mode:hover:not(:disabled){background:#7c3aed}.control-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}.engine-panel{border-top:1px dashed var(--border);margin-top:20px;padding-top:10px}textarea{width:100%;height:150px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;color:#51ff00;font-family:monospace;padding:10px;resize:vertical;margin-bottom:12px;font-size:.85rem}.file-input-wrapper{margin-bottom:12px}input[type=file]{display:none}.file-label{display:block;background:#334155;color:var(--text-color);padding:10px;text-align:center;border-radius:6px;cursor:pointer;font-size:.9rem;border:1px solid var(--border)}.file-label:hover{background:#475569}.range-container{margin-top:16px;background:rgba(0,0,0,.1);padding:12px;border-radius:6px;border:1px solid var(--border)}.range-label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--text-muted);margin-bottom:6px}input[type=range]{width:100%;accent-color:var(--primary)}
-</style></head><body><div class="console-container"><h2>8x8x8 CUBE ADVANCED ENGINE</h2><div class="status-panel" id="connectionLog">INTERFACE STATUS: DISCONNECTED</div><button class="btn btn-primary" onclick="connectBLE()">Pair HM-10 BLE Module</button><div class="control-group"><button class="btn btn-success" onclick="transmitModeToken('A')">Auto Mode ('A')</button><button class="btn btn-warning" onclick="transmitModeToken('M')">Manual Mode ('M')</button></div><button class="btn btn-primary" onclick="transmitModeToken('N')">Next Pattern Step ('N')</button><button class="btn btn-s-mode" onclick="enterSMode()">S MODE</button><div class="engine-panel"><h3>CUSTOM .TXT CODE ENGINE (MODE 'S')</h3><p style="font-size:.8rem;color:var(--text-muted);margin-bottom:10px">Use FRAME_START / FRAME_END, set(x,y,z), delay milliseconds, and next.</p><div class="file-input-wrapper"><label class="file-label" for="txtFileInput" id="fileInputLabel">Choose Script File (.txt)</label><input type="file" id="txtFileInput" accept=".txt" onchange="handleFileLoad(event)"></div><textarea id="scriptIDE" placeholder="set(3,3,0)&#10;delay 100&#10;set(3,3,1)&#10;delay 100"></textarea><div class="control-group"><button class="btn btn-primary" style="background:#475569" onclick="saveToStorage()">Save Script to Storage</button><button class="btn btn-primary" style="background:#475569" onclick="parseAndCompileScript()">Compile Code Engine</button></div><button class="btn btn-s-mode" id="runScriptButton" onclick="executeSModeTransferEngine()" disabled>DRAW / RUN CUSTOM SCRIPT</button></div><div class="range-container"><div class="range-label"><span>BRIGHTNESS CONTROL:</span><span id="brightnessVal">5</span></div><input type="range" id="brightnessRange" min="2" max="8" value="5" oninput="updateBrightness(this.value)"></div><button class="btn btn-danger" style="margin-top:20px;margin-bottom:0" onclick="disconnectBLE()">Disconnect Session</button></div><script>
+</style>
+</head>
+<body>
+<div class="console-container">
+<h2>8x8x8 CUBE LAYER-STREAM ENGINE</h2>
+<div class="status-panel" id="connectionLog">INTERFACE STATUS: DISCONNECTED</div>
+<button class="btn btn-primary" onclick="connectBLE()">Pair HM-10 BLE Module</button>
+<div class="control-group">
+<button class="btn btn-success" onclick="transmitModeToken('A')">Auto Mode ('A')</button>
+<button class="btn btn-warning" onclick="transmitModeToken('M')">Manual Mode ('M')</button>
+</div>
+<button class="btn btn-primary" onclick="transmitModeToken('N')">Next Pattern Step ('N')</button>
+<button class="btn btn-s-mode" onclick="enterSMode()">S MODE</button>
+<div class="engine-panel">
+<h3>CUSTOM .TXT CODE ENGINE (LAYER STREAM)</h3>
+<div class="file-input-wrapper"><label class="file-label" for="txtFileInput" id="fileInputLabel">Choose Script File (.txt)</label><input type="file" id="txtFileInput" accept=".txt" onchange="handleFileLoad(event)"></div>
+<textarea id="scriptIDE" placeholder="set(3,3,0)&#10;delay 100&#10;set(3,3,1)&#10;delay 100"></textarea>
+<div class="control-group">
+<button class="btn btn-primary" style="background:#475569" onclick="saveToStorage()">Save Script to Storage</button>
+<button class="btn btn-primary" style="background:#475569" onclick="parseAndCompileScript()">Compile Code Engine</button>
+</div>
+<button class="btn btn-s-mode" id="runScriptButton" onclick="executeSModeTransferEngine()" disabled>DRAW / RUN CUSTOM SCRIPT</button>
+</div>
+<div class="range-container">
+<div class="range-label"><span>BRIGHTNESS CONTROL:</span><span id="brightnessVal">5</span></div>
+<input type="range" id="brightnessRange" min="2" max="8" value="5" oninput="updateBrightness(this.value)">
+</div>
+<button class="btn btn-danger" style="margin-top:20px;margin-bottom:0" onclick="disconnectBLE()">Disconnect Session</button>
+</div>
+<script>
 let targetDevice = null, targetDataCharacteristic = null;
 const HM10_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
 const HM10_CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
 let scriptFrames = [], scriptPlaybackRunning = false, scriptPlaybackToken = 0;
 let bleWriteQueue = Promise.resolve();
 let webCubeMode = "NONE";
-let scriptFrameId = 0;
 
 function updateSModeUI(){
   document.getElementById("runScriptButton").disabled = (webCubeMode !== "S" || !targetDataCharacteristic);
 }
 
-window.addEventListener("DOMContentLoaded", ()=>{
-  const cached = localStorage.getItem("cube_cached_script");
+window.addEventListener("DOMContentLoaded", () => {
+  const cached = localStorage.getItem("cube_cached_script_layer");
   if(cached) document.getElementById("scriptIDE").value = cached;
   updateSModeUI();
 });
 
 function saveToStorage(){
   const code = document.getElementById("scriptIDE").value;
-  localStorage.setItem("cube_cached_script", code);
-  alert("Script saved to browser storage successfully!");
+  localStorage.setItem("cube_cached_script_layer", code);
+  alert("Script saved successfully!");
 }
 
 function handleFileLoad(event){
@@ -37,9 +65,9 @@ function handleFileLoad(event){
   const file = input.files[0];
   document.getElementById("fileInputLabel").innerText = file.name;
   const reader = new FileReader();
-  reader.onload = ()=>{
+  reader.onload = () => {
     document.getElementById("scriptIDE").value = reader.result;
-    localStorage.setItem("cube_cached_script", reader.result);
+    localStorage.setItem("cube_cached_script_layer", reader.result);
     const count = parseAndCompileScript();
     document.getElementById("connectionLog").innerText = "SCRIPT LOADED: " + count + " FRAME(S)";
   };
@@ -106,7 +134,7 @@ function parseAndCompileScript(){
     const m = line.match(/set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
     if(!m) continue;
 
-    const x = parseInt(m[1],10), y = parseInt(m[2],10), z = parseInt(m[3],10);
+    const x = parseInt(m[1], 10), y = parseInt(m[2], 10), z = parseInt(m[3], 10);
     if(x < 0 || x >= 8 || y < 0 || y >= 8 || z < 0 || z >= 8) continue;
 
     const index = z * 64 + y * 8 + x;
@@ -118,7 +146,6 @@ function parseAndCompileScript(){
 
   if(hasCommands) pushFrame();
   document.getElementById("runScriptButton").disabled = !(webCubeMode === "S" && targetDataCharacteristic && scriptFrames.length);
-  console.log("Compiled 512-bit frames:", scriptFrames.length, "(64 bytes/frame)");
   return scriptFrames.length;
 }
 
@@ -190,7 +217,7 @@ function disconnectBLE(){
 }
 
 function queueBLEWrite(data, token = null){
-  bleWriteQueue = bleWriteQueue.catch(()=>{}).then(async()=>{
+  bleWriteQueue = bleWriteQueue.catch(() => {}).then(async() => {
     if(!targetDataCharacteristic) throw new Error("Bluetooth disconnected.");
     if(token !== null && token !== scriptPlaybackToken) return;
 
@@ -241,12 +268,10 @@ async function transmitModeToken(c){
 
   try{
     if(leavingS) await new Promise(r => setTimeout(r, 150));
-
-    // Send single raw ASCII character directly to match Arduino loop parser
     const encoder = new TextEncoder();
     await queueBLEWrite(encoder.encode(c));
   }catch(e){
-    console.error("Mode command error:", e);
+    console.error("Mode command:", e);
   }
 }
 
@@ -264,18 +289,12 @@ async function enterSMode(){
   const log = document.getElementById("connectionLog");
 
   try{
-    await bleWriteQueue.catch(()=>{});
-    
-    // 1. Send single ASCII 'S' character to trigger enterScriptMode() on Arduino
-    const encoder = new TextEncoder();
-    await queueBLEWrite(encoder.encode("S"));
-
-    // 2. Transmit an explicit zeroed 64-byte frame immediately to clear LED buffer
-    const blankBuffer = new Uint8Array(64);
-    await sendSingleScriptFrame(blankBuffer, scriptPlaybackToken);
+    await bleWriteQueue.catch(() => {});
+    const packet = new Uint8Array([0xFF, 0x53, 0x00]);
+    await queueBLEWrite(packet);
 
     if(targetDataCharacteristic && webCubeMode === "S"){
-      log.innerText = "CONNECTED (S MODE / READY)";
+      log.innerText = "CONNECTED (S MODE / LAYER STREAM)";
       log.style.color = "#8b5cf6";
     }
   }catch(e){
@@ -289,40 +308,23 @@ async function enterSMode(){
 
 async function sendSingleScriptFrame(frameBytes, token){
   if(!(frameBytes instanceof Uint8Array) || frameBytes.length !== 64){
-    throw new Error("S frame must contain exactly 64 bytes (512 bits)");
+    throw new Error("S frame must contain exactly 64 bytes");
   }
 
-  await queueBLEWrite(new Uint8Array([0xFF, 0x46, scriptFrameId & 0xFF]), token);
-  scriptFrameId = (scriptFrameId + 1) & 0xFF;
+  for(let layer = 0; layer < 8; layer++){
+    if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") return false;
+    
+    const layerData = frameBytes.slice(layer * 8, (layer + 1) * 8);
+    const packet = new Uint8Array(10);
+    packet[0] = 0xFF;
+    packet[1] = layer;
+    packet.set(layerData, 2);
 
-  const CHUNK_SIZE = 3;
-  for(let offset = 0; offset < frameBytes.length; offset += CHUNK_SIZE){
-    if(!scriptPlaybackRunning && webCubeMode !== "S") return false;
-    if(token !== null && token !== scriptPlaybackToken) return false;
-    
-    const chunk = frameBytes.slice(offset, Math.min(offset + CHUNK_SIZE, frameBytes.length));
-    await queueBLEWrite(chunk, token);
-    
-    // Crucial 15ms pacing delay for 9600 Baud AltSoftSerial stability
-    await new Promise(r => setTimeout(r, 15));
+    await queueBLEWrite(packet, token);
+    await new Promise(r => setTimeout(r, 2));
   }
   return true;
 }
-
-async function sendSFrame(frameBytes){
-  if(!targetDataCharacteristic || webCubeMode !== "S") return false;
-  if(Array.isArray(frameBytes)) frameBytes = Uint8Array.from(frameBytes);
-  if(!(frameBytes instanceof Uint8Array) || frameBytes.length !== 64){
-    throw new Error("S frame must contain exactly 64 bytes (512 bits)");
-  }
-  const oldRunning = scriptPlaybackRunning;
-  const oldToken = scriptPlaybackToken;
-  scriptPlaybackRunning = true;
-  const ok = await sendSingleScriptFrame(frameBytes, oldToken);
-  if(!oldRunning) scriptPlaybackRunning = false;
-  return ok;
-}
-window.sendSFrame = sendSFrame;
 
 async function executeSModeTransferEngine(){
   if(!targetDataCharacteristic){
@@ -337,11 +339,9 @@ async function executeSModeTransferEngine(){
 
   scriptPlaybackRunning = false;
   scriptPlaybackToken++;
-
   const token = scriptPlaybackToken;
 
-  await bleWriteQueue.catch(()=>{});
-
+  await bleWriteQueue.catch(() => {});
   if(token !== scriptPlaybackToken || webCubeMode !== "S") return;
 
   if(!parseAndCompileScript()){
@@ -350,19 +350,16 @@ async function executeSModeTransferEngine(){
   }
 
   scriptPlaybackRunning = true;
-
   const log = document.getElementById("connectionLog");
-  log.innerText = "DRAWING " + scriptFrames.length + " FRAME(S)...";
+  log.innerText = "STREAMING " + scriptFrames.length + " LAYER FRAMES...";
   log.style.color = "#8b5cf6";
 
   try{
     while(scriptPlaybackRunning && token === scriptPlaybackToken && webCubeMode === "S"){
       for(const frame of scriptFrames){
         if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") break;
-
         const ok = await sendSingleScriptFrame(frame.bytes, token);
         if(!ok) break;
-
         await new Promise(r => setTimeout(r, frame.delay));
       }
     }
@@ -378,4 +375,6 @@ async function executeSModeTransferEngine(){
     log.innerText = "CONNECTED (S MODE)";
   }
 }
-</script></body></html>
+</script>
+</body>
+</html>
