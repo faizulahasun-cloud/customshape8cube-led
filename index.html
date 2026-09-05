@@ -6,14 +6,6 @@
     <title>8x8x8 LED Cube Console - Hybrid Studio</title>
     <style>
         :root{--bg-color:#0b0f19;--panel-bg:#151f32;--text-color:#f1f5f9;--text-muted:#94a3b8;--primary:#2563eb;--primary-hover:#1d4ed8;--success:#10b981;--success-hover:#059669;--warning:#f59e0b;--warning-hover:#d97706;--danger:#ef4444;--danger-hover:#dc2626;--border:#334155}
-        *{box-sizin<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>8x8x8 LED Cube Console - Hybrid Studio</title>
-    <style>
-        :root{--bg-color:#0b0f19;--panel-bg:#151f32;--text-color:#f1f5f9;--text-muted:#94a3b8;--primary:#2563eb;--primary-hover:#1d4ed8;--success:#10b981;--success-hover:#059669;--warning:#f59e0b;--warning-hover:#d97706;--danger:#ef4444;--danger-hover:#dc2626;--border:#334155}
         *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
         body{background:var(--bg-color);color:var(--text-color);padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh}
         .console-container{background:var(--panel-bg);border:1px solid var(--border);border-radius:12px;width:100%;max-width:650px;padding:24px;box-shadow:0 10px 25px -5px rgba(0,0,0,.3)}
@@ -430,516 +422,108 @@
     function sendCustomShape(type){
         let frame64 = new Uint8Array(64);
         if(type === 'HEART'){
-            for(let i=0; i<64; i++){
-                if(i >= 16 && i <= 48) frame64[i] = 0b01100110;
-                if(i >= 24 && i <= 40) frame64[i] = 0b11111111;
-            }
-        }else if(type === 'CROSS'){
-            for(let z=0; z<8; z++){
-                frame64[z*8 + 3] = 0x18;
-                frame64[z*8 + 4] = 0x18;
-            }
-            for(let z=2; z<=5; z++){
-                for(let x=1; x<=6; x++){
-                    frame64[z*8 + x] |= 0x18;
+            // 3D Heart Shape across 8x8x8 LED Cube
+            // Designed for 8 layers (z = 0 to 7), 8x8 grid per layer
+            // Layer 0 (bottom): Small base/tip
+            // Layer 1-2: Expanding lower lobes
+            // Layer 3-4: Full heart body with upper clefts / dual lobes
+            // Layer 5-6: Distinct twin peaks/arches
+            // Layer 7 (top): Upper tips fading out
+            const heartSlices = [
+                // z = 0 (Layer 0) - Tip of the heart at bottom center
+                [
+                    0b00000000,
+                    0b00000000,
+                    0b00011000,
+                    0b00111100,
+                    0b00111100,
+                    0b00011000,
+                    0b00000000,
+                    0b00000000
+                ],
+                // z = 1 (Layer 1)
+                [
+                    0b00000000,
+                    0b00011000,
+                    0b00111100,
+                    0b01111110,
+                    0b01111110,
+                    0b00111100,
+                    0b00011000,
+                    0b00000000
+                ],
+                // z = 2 (Layer 2) - Widening body
+                [
+                    0b00011000,
+                    0b01111110,
+                    0b11111111,
+                    0b11111111,
+                    0b11111111,
+                    0b01111110,
+                    0b00111100,
+                    0b00011000
+                ],
+                // z = 3 (Layer 3) - Full width lobes
+                [
+                    0b00111100,
+                    0b01111110,
+                    0b11111111,
+                    0b11111111,
+                    0b11111111,
+                    0b01111110,
+                    0b00111100,
+                    0b00011000
+                ],
+                // z = 4 (Layer 4) - Beginning of upper cleft (center hollow / indent)
+                [
+                    0b01100110,
+                    0b11111111,
+                    0b11111111,
+                    0b11111111,
+                    0b01111110,
+                    0b00111100,
+                    0b00011000,
+                    0b00000000
+                ],
+                // z = 5 (Layer 5) - Dual lobes clearly separated
+                [
+                    0b01100110,
+                    0b11111111,
+                    0b11111111,
+                    0b01111110,
+                    0b00111100,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000
+                ],
+                // z = 6 (Layer 6) - Upper arch peaks
+                [
+                    0b00100100,
+                    0b01100110,
+                    0b01000010,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000
+                ],
+                // z = 7 (Layer 7) - Top tips
+                [
+                    0b00000000,
+                    0b00100100,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000,
+                    0b00000000
+                ]
+            ];
+
+            for(let z = 0; z < 8; z++){
+                for(let y = 0; y < 8; y++){
+                    frame64[z * 8 + y] = heartSlices[z][y];
                 }
-            }
-        }
-        send64ByteCustomMatrix(frame64);
-    }
-
-    async function sendSingleScriptFrame(frameBytes, token){
-        if(!(frameBytes instanceof Uint8Array) || frameBytes.length !== 64){
-            throw new Error("S frame must contain exactly 64 bytes");
-        }
-
-        for(let layer = 0; layer < 8; layer++){
-            if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") return false;
-
-            const layerData = frameBytes.slice(layer * 8, (layer + 1) * 8);
-            const packet = new Uint8Array(10);
-            packet[0] = 0xFF;
-            packet[1] = layer;
-            packet.set(layerData, 2);
-
-            await queueBLEWrite(packet, token);
-            await new Promise(r => setTimeout(r, 2));
-        }
-        return true;
-    }
-
-    async function executeSModeTransferEngine(){
-        if(!targetDataCharacteristic){
-            alert("Please connect to Bluetooth HM-10 first!");
-            return;
-        }
-
-        if(webCubeMode !== "S"){
-            alert("Enter S MODE first.");
-            return;
-        }
-
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
-        const token = scriptPlaybackToken;
-
-        await bleWriteQueue.catch(() => {});
-        if(token !== scriptPlaybackToken || webCubeMode !== "S") return;
-
-        if(!parseAndCompileScript()){
-            alert("No valid frames found.");
-            return;
-        }
-
-        scriptPlaybackRunning = true;
-        const log = document.getElementById("connectionLog");
-        log.innerText = "STREAMING " + scriptFrames.length + " LAYER FRAMES...";
-        log.style.color = "#8b5cf6";
-
-        try{
-            while(scriptPlaybackRunning && token === scriptPlaybackToken && webCubeMode === "S"){
-                for(const frame of scriptFrames){
-                    if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") break;
-                    drawPreview(frame.bytes);
-                    const ok = await sendSingleScriptFrame(frame.bytes, token);
-                    if(!ok) break;
-                    await new Promise(r => setTimeout(r, frame.delay));
-                }
-            }
-        }catch(e){
-            scriptPlaybackRunning = false;
-            log.innerText = "TRANSMISSION ERROR";
-            log.style.color = "var(--danger)";
-            console.error("S-Mode:", e);
-            return;
-        }
-
-        if(targetDataCharacteristic && webCubeMode === "S" && token === scriptPlaybackToken){
-            log.innerText = "CONNECTED (S MODE)";
-        }
-    }
-</script>
-</body>
-</html>
-g:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-        body{background:var(--bg-color);color:var(--text-color);padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh}
-        .console-container{background:var(--panel-bg);border:1px solid var(--border);border-radius:12px;width:100%;max-width:650px;padding:24px;box-shadow:0 10px 25px -5px rgba(0,0,0,.3)}
-        h2{font-size:1.5rem;letter-spacing:1px;text-align:center;margin-bottom:20px;color:#fff;border-bottom:2px solid var(--border);padding-bottom:12px}
-        h3{font-size:1rem;color:var(--text-muted);margin-top:24px;margin-bottom:12px;letter-spacing:.5px}
-        .status-panel{background:rgba(0,0,0,.2);border:1px solid var(--border);padding:12px;border-radius:6px;font-family:monospace;font-size:.9rem;text-align:center;margin-bottom:20px;color:var(--warning)}
-        .status-disconnected{color:var(--danger)}
-        .status-connected{color:var(--success)}
-        .btn{display:block;width:100%;padding:12px;margin-bottom:12px;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;transition:background-color .2s,opacity .2s;text-align:center;text-transform:uppercase}
-        .btn:disabled{opacity:.4;cursor:not-allowed}
-        .btn-primary{background:var(--primary);color:#fff}
-        .btn-primary:hover:not(:disabled){background:var(--primary-hover)}
-        .btn-success{background:var(--success);color:#fff}
-        .btn-success:hover:not(:disabled){background:var(--success-hover)}
-        .btn-warning{background:var(--warning);color:#fff}
-        .btn-warning:hover:not(:disabled){background:var(--warning-hover)}
-        .btn-danger{background:var(--danger);color:#fff}
-        .btn-danger:hover:not(:disabled){background:var(--danger-hover)}
-        .btn-s-mode{background:#8b5cf6;color:#fff;margin-top:10px}
-        .btn-s-mode:hover:not(:disabled){background:#7c3aed}
-        .btn-custom{background:#aa00ff;color:#fff}
-        .btn-custom:hover:not(:disabled){background:#7b1fa2}
-        .control-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        .engine-panel{border-top:1px dashed var(--border);margin-top:20px;padding-top:10px}
-        textarea{width:100%;height:150px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;color:#51ff00;font-family:monospace;padding:10px;resize:vertical;margin-bottom:12px;font-size:.85rem}
-        .file-input-wrapper{margin-bottom:12px}
-        input[type=file]{display:none}
-        .file-label{display:block;background:#334155;color:var(--text-color);padding:10px;text-align:center;border-radius:6px;cursor:pointer;font-size:.9rem;border:1px solid var(--border)}
-        .file-label:hover{background:#475569}
-        .preview-box{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:12px;text-align:center}
-        .preview-label{font-size:.8rem;color:var(--text-muted);margin-bottom:6px;display:flex;justify-content:space-between}
-        .range-container{margin-top:16px;background:rgba(0,0,0,.1);padding:12px;border-radius:6px;border:1px solid var(--border)}
-        .range-label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--text-muted);margin-bottom:6px}
-        input[type=range]{width:100%;accent-color:var(--primary)}
-    </style>
-</head>
-<body>
-
-<div class="console-container">
-    <h2>8x8x8 LED CUBE CONSOLE</h2>
-    <div class="status-panel" id="connectionLog">INTERFACE STATUS: DISCONNECTED</div>
-    
-    <button id="connectBtn" class="btn btn-primary" onclick="triggerBLELinkSession()">Pair HM-10 BLE Module</button>
-    <button id="disconnectBtn" class="btn btn-danger" onclick="terminateConnectionSequence()" style="display:none; margin-bottom:12px;">Disconnect Session</button>
-
-    <div class="control-group">
-        <button class="btn btn-success" onclick="transmitModeToken('A')">Auto Mode ('A')</button>
-        <button class="btn btn-warning" onclick="transmitModeToken('M')">Manual Mode ('M')</button>
-    </div>
-    <button class="btn btn-primary" style="background:#ffd600; color:#121212;" onclick="transmitModeToken('N')">Next Pattern Step ('N')</button>
-    
-    <button class="btn btn-s-mode" onclick="enterSMode()">S MODE</button>
-
-    <div class="engine-panel">
-        <h3>CUSTOM STORAGE SHAPES (MODE 'S')</h3>
-        <div class="control-group" style="margin-bottom:12px;">
-            <button class="btn btn-custom" onclick="sendCustomShape('HEART')">Send 3D Heart</button>
-            <button class="btn btn-custom" onclick="sendCustomShape('CROSS')">Send 3D Cross</button>
-        </div>
-
-        <h3>CUSTOM .TXT CODE ENGINE (LAYER STREAM)</h3>
-        <div class="file-input-wrapper">
-            <label class="file-label" for="txtFileInput" id="fileInputLabel">Choose Script File (.txt)</label>
-            <input type="file" id="txtFileInput" accept=".txt" onchange="handleFileLoad(event)">
-        </div>
-        <textarea id="scriptIDE" placeholder="set(3,3,0)&#10;delay 100&#10;set(3,3,1)&#10;delay 100" oninput="parseAndCompileScript()"></textarea>
-        
-        <div class="preview-box">
-            <div class="preview-label">
-                <span>LIVE FRAME PREVIEW (Layer 0):</span>
-                <span id="frameCountLabel">0 Frames Compiled</span>
-            </div>
-            <canvas id="layerPreviewCanvas" width="160" height="160" style="background:#000;border-radius:4px;width:120px;height:120px;image-rendering:pixelated;"></canvas>
-        </div>
-
-        <div class="control-group">
-            <button class="btn btn-primary" style="background:#475569" onclick="saveToStorage()">Save Script</button>
-            <button class="btn btn-primary" style="background:#475569" onclick="parseAndCompileScript()">Compile Code</button>
-        </div>
-        <button class="btn btn-s-mode" id="runScriptButton" onclick="executeSModeTransferEngine()" disabled>DRAW / RUN CUSTOM SCRIPT</button>
-    </div>
-
-    <div class="range-container">
-        <div class="range-label">
-            <span>BRIGHTNESS CONTROL:</span>
-            <span id="sliderValLabel">5</span>
-        </div>
-        <input type="range" id="brightnessInputSlider" min="2" max="8" value="5" step="1" oninput="executeBrightnessShift(this.value)">
-    </div>
-</div>
-
-<script>
-    let physicalTargetDevice = null, targetDataCharacteristic = null;
-    const HM10_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
-    const HM10_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
-    
-    let scriptFrames = [], scriptPlaybackRunning = false, scriptPlaybackToken = 0;
-    let bleWriteQueue = Promise.resolve();
-    let webCubeMode = "NONE";
-
-    function updateSModeUI(){
-        const runBtn = document.getElementById("runScriptButton");
-        if(runBtn) {
-            runBtn.disabled = (webCubeMode !== "S" || !targetDataCharacteristic || scriptFrames.length === 0);
-        }
-    }
-     
-    window.addEventListener("DOMContentLoaded", () => {
-        const cached = localStorage.getItem("cube_cached_script_layer");
-        if(cached) document.getElementById("scriptIDE").value = cached;
-        parseAndCompileScript();
-        updateSModeUI();
-    });
-
-    function saveToStorage(){
-        const code = document.getElementById("scriptIDE").value;
-        localStorage.setItem("cube_cached_script_layer", code);
-        alert("Script saved successfully!");
-    }
-
-    function handleFileLoad(event){
-        const input = event.target;
-        if(!input.files || !input.files.length) return;
-        const file = input.files[0];
-        document.getElementById("fileInputLabel").innerText = file.name;
-
-        const reader = new FileReader();
-        reader.onload = () => {
-            document.getElementById("scriptIDE").value = reader.result;
-            localStorage.setItem("cube_cached_script_layer", reader.result);
-            const count = parseAndCompileScript();
-            document.getElementById("connectionLog").innerText = "SCRIPT LOADED: " + count + " FRAME(S)";
-        };
-        reader.readAsText(file);
-    }
-
-    function parseDelayCommand(line){
-        const m = line.match(/^delay\s*(?:\(\s*)?(\d+)(?:\s*\))?\s*$/i);
-        if(!m) return null;
-        const value = parseInt(m[1], 10);
-        return Number.isFinite(value) ? Math.max(0, value) : null;
-    }
-
-    function drawPreview(frameBytes){
-        const canvas = document.getElementById("layerPreviewCanvas");
-        if(!canvas) return;
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const cellW = canvas.width / 8;
-        const cellH = canvas.height / 8;
-
-        for(let y = 0; y < 8; y++){
-            for(let x = 0; x < 8; x++){
-                const index = 0 * 64 + y * 8 + x;
-                const byteIndex = index >> 3;
-                const bitIndex = index & 7;
-                const isOn = (frameBytes[byteIndex] & (1 << bitIndex)) !== 0;
-
-                if(isOn){
-                    ctx.fillStyle = "#51ff00";
-                    ctx.fillRect(x * cellW + 1, y * cellH + 1, cellW - 2, cellH - 2);
-                }
-            }
-        }
-    }
-
-    function parseAndCompileScript(){
-        scriptFrames = [];
-        const scriptElem = document.getElementById("scriptIDE");
-        if(!scriptElem) return 0;
-        const lines = scriptElem.value.split(/\r?\n/);
-        let frameBytes = new Uint8Array(64);
-        let frameOpen = false;
-        let hasCommands = false;
-        let pendingDelay = null;
-        const defaultDelay = 250;
-
-        function pushFrame(force = false){
-            if(!hasCommands && !force) return;
-            scriptFrames.push({bytes: frameBytes.slice(), delay: (pendingDelay === null ? defaultDelay : pendingDelay)});
-            frameBytes = new Uint8Array(64);
-            pendingDelay = null;
-            hasCommands = false;
-            frameOpen = false;
-        }
-
-        for(let line of lines){
-            line = line.trim();
-            if(!line || line.startsWith("//") || line.startsWith("#")) continue;
-            const upper = line.toUpperCase();
-
-            if(upper === "FRAME_START"){
-                if(hasCommands) pushFrame();
-                frameOpen = true;
-                frameBytes = new Uint8Array(64);
-                hasCommands = false;
-                pendingDelay = null;
-                continue;
-            }
-
-            if(upper === "FRAME_END"){
-                pushFrame(true);
-                continue;
-            }
-
-            const delay = parseDelayCommand(line);
-            if(delay !== null){
-                pendingDelay = delay;
-                if(hasCommands && !frameOpen) pushFrame();
-                continue;
-            }
-
-            if(upper === "NEXT"){
-                if(hasCommands) pushFrame();
-                else if(frameOpen) pushFrame(true);
-                continue;
-            }
-
-            const m = line.match(/set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-            if(!m) continue;
-
-            const x = parseInt(m[1], 10), y = parseInt(m[2], 10), z = parseInt(m[3], 10);
-            if(x < 0 || x >= 8 || y < 0 || y >= 8 || z < 0 || z >= 8) continue;
-
-            const index = z * 64 + y * 8 + x;
-            const byteIndex = index >> 3;
-            const bitIndex = index & 7;
-            frameBytes[byteIndex] |= (1 << bitIndex);
-            hasCommands = true;
-        }
-
-        if(hasCommands) pushFrame();
-        const count = scriptFrames.length;
-        const frameCountLabel = document.getElementById("frameCountLabel");
-        if(frameCountLabel) frameCountLabel.innerText = count + " Frame(s) Compiled";
-        if(count > 0) drawPreview(scriptFrames[0].bytes);
-        updateSModeUI();
-        return count;
-    }
-
-    async function triggerBLELinkSession(){
-        const log = document.getElementById("connectionLog");
-        log.innerText = "SEARCHING...";
-        log.style.color = "var(--warning)";
-
-        try{
-            physicalTargetDevice = await navigator.bluetooth.requestDevice({
-                filters: [{services: [HM10_SERVICE_UUID]}],
-                optionalServices: [HM10_SERVICE_UUID]
-            });
-
-            log.innerText = "CONNECTING TO GATT LAYER...";
-            const server = await physicalTargetDevice.gatt.connect();
-            const service = await server.getPrimaryService(HM10_SERVICE_UUID);
-            targetDataCharacteristic = await service.getCharacteristic(HM10_CHAR_UUID);
-
-            log.innerText = "INTERFACE STATUS: CONNECTED";
-            log.className = "status-panel status-connected";
-            document.getElementById('connectBtn').style.display = "none";
-            document.getElementById('disconnectBtn').style.display = "block";
-
-            webCubeMode = "NONE";
-            scriptPlaybackRunning = false;
-            scriptPlaybackToken++;
-            updateSModeUI();
-
-            physicalTargetDevice.addEventListener("gattserverdisconnected", cleanSessionStateWipe);
-        }catch(e){
-            console.error(e);
-            targetDataCharacteristic = null;
-            webCubeMode = "NONE";
-            scriptPlaybackRunning = false;
-            scriptPlaybackToken++;
-            updateSModeUI();
-            log.innerText = "CONNECTION FAILED";
-            log.className = "status-panel status-disconnected";
-            alert("Connection Failed: " + e.message);
-        }
-    }
-
-    function cleanSessionStateWipe(){
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
-        targetDataCharacteristic = null;
-        physicalTargetDevice = null;
-        webCubeMode = "NONE";
-        updateSModeUI();
-        const log = document.getElementById('connectionLog');
-        log.innerText = "DISCONNECTED";
-        log.className = "status-panel status-disconnected";
-        document.getElementById('connectBtn').style.display = "block";
-        document.getElementById('disconnectBtn').style.display = "none";
-    }
-
-    async function terminateConnectionSequence(){
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
-        targetDataCharacteristic = null;
-        webCubeMode = "NONE";
-        updateSModeUI();
-        if(physicalTargetDevice && physicalTargetDevice.gatt.connected){
-            try {
-                await transmitModeToken('Q');
-            } catch(e) {}
-            physicalTargetDevice.gatt.disconnect();
-        }
-        cleanSessionStateWipe();
-    }
-
-    function queueBLEWrite(data, token = null){
-        bleWriteQueue = bleWriteQueue.catch(() => {}).then(async() => {
-            if(!targetDataCharacteristic) throw new Error("Bluetooth disconnected.");
-            if(token !== null && token !== scriptPlaybackToken) return;
-
-            let attempts = 0;
-            while(attempts < 5){
-                if(token !== null && token !== scriptPlaybackToken) return;
-                try{
-                    await targetDataCharacteristic.writeValueWithoutResponse(data);
-                    return;
-                }catch(e){
-                    attempts++;
-                    const msg = e && e.message ? e.message : "";
-                    if(!msg.toLowerCase().includes("already in progress")) throw e;
-                    await new Promise(r => setTimeout(r, 100));
-                }
-            }
-            throw new Error("BLE GATT remained busy after multiple retries.");
-        });
-        return bleWriteQueue;
-    }
-
-    async function executeBrightnessShift(val){
-        document.getElementById("sliderValLabel").innerText = val;
-        if(webCubeMode === "S") return;
-        try{
-            await queueBLEWrite(new Uint8Array([0x42, parseInt(val, 10)]));
-        }catch(e){
-            console.error("Brightness transmission:", e);
-        }
-    }
-
-    async function transmitModeToken(c){
-        if(!targetDataCharacteristic) return;
-        if(c === "N" && webCubeMode !== "M") return;
-
-        const leavingS = (webCubeMode === "S" && (c === "A" || c === "M" || c === "Q"));
-
-        if(c === "A" || c === "M" || c === "Q"){
-            scriptPlaybackRunning = false;
-            scriptPlaybackToken++;
-        }
-
-        if(c === "A") webCubeMode = "A";
-        else if(c === "M") webCubeMode = "M";
-        else if(c === "Q") webCubeMode = "A";
-
-        updateSModeUI();
-
-        try{
-            if(leavingS) await new Promise(r => setTimeout(r, 150));
-            const encoder = new TextEncoder();
-            await queueBLEWrite(encoder.encode(c));
-        }catch(e){
-            console.error("Mode command:", e);
-        }
-    }
-
-    async function enterSMode(){
-        if(!targetDataCharacteristic){
-            alert("Please connect to Bluetooth HM-10 first!");
-            return;
-        }
-
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
-        webCubeMode = "S";
-        updateSModeUI();
-        const log = document.getElementById("connectionLog");
-
-        try{
-            await bleWriteQueue.catch(() => {});
-            const packet = new Uint8Array([0xFF, 0x53]);
-            await queueBLEWrite(packet);
-
-            if(targetDataCharacteristic && webCubeMode === "S"){
-                log.innerText = "CONNECTED (S MODE / LAYER STREAM)";
-                log.style.color = "#8b5cf6";
-            }
-        }catch(e){
-            webCubeMode = "NONE";
-            updateSModeUI();
-            log.innerText = "S MODE ENTRY FAILED";
-            log.style.color = "var(--danger)";
-            alert("S-Mode entry failed: " + e.message);
-        }
-    }
-
-    async function send64ByteCustomMatrix(matrix64Bytes){
-        if(!targetDataCharacteristic) return;
-        await transmitModeToken('S');
-        await new Promise(r => setTimeout(r, 50));
-
-        const CHUNK_SIZE = 16;
-        for (let i = 0; i < matrix64Bytes.length; i += CHUNK_SIZE) {
-            const chunk = matrix64Bytes.slice(i, i + CHUNK_SIZE);
-            await targetDataCharacteristic.writeValueWithoutResponse(chunk);
-            await new Promise(r => setTimeout(r, 20));
-        }
-    }
-
-    function sendCustomShape(type){
-        let frame64 = new Uint8Array(64);
-        if(type === 'HEART'){
-            for(let i=0; i<64; i++){
-                if(i >= 16 && i <= 48) frame64[i] = 0b01100110;
-                if(i >= 24 && i <= 40) frame64[i] = 0b11111111;
             }
         }else if(type === 'CROSS'){
             for(let z=0; z<8; z++){
