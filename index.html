@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>8x8x8 LED Cube Console - Layer Stream Engine</title>
 <style>
-:root{--bg-color:#0b0f19;--panel-bg:#151f32;--text-color:#f1f5f9;--text-muted:#94a3b8;--primary:#2563eb;--primary-hover:#1d4ed8;--success:#10b981;--success-hover:#059669;--warning:#f59e0b;--warning-hover:#d97706;--danger:#ef4444;--danger-hover:#dc2626;--border:#334155}*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}body{background:var(--bg-color);color:var(--text-color);padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh}.console-container{background:var(--panel-bg);border:1px solid var(--border);border-radius:12px;width:100%;max-width:600px;padding:24px;box-shadow:0 10px 25px -5px rgba(0,0,0,.3)}h2{font-size:1.5rem;letter-spacing:1px;text-align:center;margin-bottom:20px;color:#fff;border-bottom:2px solid var(--border);padding-bottom:12px}h3{font-size:1rem;color:var(--text-muted);margin-top:24px;margin-bottom:12px;letter-spacing:.5px}.status-panel{background:rgba(0,0,0,.2);border:1px solid var(--border);padding:12px;border-radius:6px;font-family:monospace;font-size:.9rem;text-align:center;margin-bottom:20px;color:var(--warning)}.btn{display:block;width:100%;padding:12px;margin-bottom:12px;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;transition:background-color .2s,opacity .2s;text-align:center}.btn:disabled{opacity:.4;cursor:not-allowed}.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover:not(:disabled){background:var(--primary-hover)}.btn-success{background:var(--success);color:#fff}.btn-success:hover:not(:disabled){background:var(--success-hover)}.btn-warning{background:var(--warning);color:#fff}.btn-warning:hover:not(:disabled){background:var(--warning-hover)}.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover:not(:disabled){background:var(--danger-hover)}.btn-s-mode{background:#8b5cf6;color:#fff;margin-top:10px}.btn-s-mode:hover:not(:disabled){background:#7c3aed}.control-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}.engine-panel{border-top:1px dashed var(--border);margin-top:20px;padding-top:10px}textarea{width:100%;height:150px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;color:#51ff00;font-family:monospace;padding:10px;resize:vertical;margin-bottom:12px;font-size:.85rem}.file-input-wrapper{margin-bottom:12px}input[type=file]{display:none}.file-label{display:block;background:#334155;color:var(--text-color);padding:10px;text-align:center;border-radius:6px;cursor:pointer;font-size:.9rem;border:1px solid var(--border)}.file-label:hover{background:#475569}.range-container{margin-top:16px;background:rgba(0,0,0,.1);padding:12px;border-radius:6px;border:1px solid var(--border)}.range-label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--text-muted);margin-bottom:6px}input[type=range]{width:100%;accent-color:var(--primary)}
+:root{--bg-color:#0b0f19;--panel-bg:#151f32;--text-color:#f1f5f9;--text-muted:#94a3b8;--primary:#2563eb;--primary-hover:#1d4ed8;--success:#10b981;--success-hover:#059669;--warning:#f59e0b;--warning-hover:#d97706;--danger:#ef4444;--danger-hover:#dc2626;--border:#334155}*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}body{background:var(--bg-color);color:var(--text-color);padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh}.console-container{background:var(--panel-bg);border:1px solid var(--border);border-radius:12px;width:100%;max-width:600px;padding:24px;box-shadow:0 10px 25px -5px rgba(0,0,0,.3)}h2{font-size:1.5rem;letter-spacing:1px;text-align:center;margin-bottom:20px;color:#fff;border-bottom:2px solid var(--border);padding-bottom:12px}h3{font-size:1rem;color:var(--text-muted);margin-top:24px;margin-bottom:12px;letter-spacing:.5px}.status-panel{background:rgba(0,0,0,.2);border:1px solid var(--border);padding:12px;border-radius:6px;font-family:monospace;font-size:.9rem;text-align:center;margin-bottom:20px;color:var(--warning)}.btn{display:block;width:100%;padding:12px;margin-bottom:12px;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;transition:background-color .2s,opacity .2s;text-align:center}.btn:disabled{opacity:.4;cursor:not-allowed}.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover:not(:disabled){background:var(--primary-hover)}.btn-success{background:var(--success);color:#fff}.btn-success:hover:not(:disabled){background:var(--success-hover)}.btn-warning{background:var(--warning);color:#fff}.btn-warning:hover:not(:disabled){background:var(--warning-hover)}.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover:not(:disabled){background:var(--danger-hover)}.btn-s-mode{background:#8b5cf6;color:#fff;margin-top:10px}.btn-s-mode:hover:not(:disabled){background:#7c3aed}.control-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}.engine-panel{border-top:1px dashed var(--border);margin-top:20px;padding-top:10px}textarea{width:100%;height:150px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;color:#51ff00;font-family:monospace;padding:10px;resize:vertical;margin-bottom:12px;font-size:.85rem}.file-input-wrapper{margin-bottom:12px}input[type=file]{display:none}.file-label{display:block;background:#334155;color:var(--text-color);padding:10px;text-align:center;border-radius:6px;cursor:pointer;font-size:.9rem;border:1px solid var(--border)}.file-label:hover{background:#475569}.preview-box{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:12px;text-align:center}.preview-label{font-size:.8rem;color:var(--text-muted);margin-bottom:6px;display:flex;justify-content:space-between}.range-container{margin-top:16px;background:rgba(0,0,0,.1);padding:12px;border-radius:6px;border:1px solid var(--border)}.range-label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--text-muted);margin-bottom:6px}input[type=range]{width:100%;accent-color:var(--primary)}
 </style>
 </head>
 <body>
@@ -22,10 +22,14 @@
 <div class="engine-panel">
 <h3>CUSTOM .TXT CODE ENGINE (LAYER STREAM)</h3>
 <div class="file-input-wrapper"><label class="file-label" for="txtFileInput" id="fileInputLabel">Choose Script File (.txt)</label><input type="file" id="txtFileInput" accept=".txt" onchange="handleFileLoad(event)"></div>
-<textarea id="scriptIDE" placeholder="set(3,3,0)&#10;delay 100&#10;set(3,3,1)&#10;delay 100"></textarea>
+<textarea id="scriptIDE" placeholder="set(3,3,0)&#10;delay 100&#10;set(3,3,1)&#10;delay 100" oninput="parseAndCompileScript()"></textarea>
+<div class="preview-box">
+<div class="preview-label"><span>LIVE FRAME PREVIEW (Layer 0):</span><span id="frameCountLabel">0 Frames Compiled</span></div>
+<canvas id="layerPreviewCanvas" width="160" height="160" style="background:#000;border-radius:4px;width:120px;height:120px;image-rendering:pixelated;"></canvas>
+</div>
 <div class="control-group">
-<button class="btn btn-primary" style="background:#475569" onclick="saveToStorage()">Save Script to Storage</button>
-<button class="btn btn-primary" style="background:#475569" onclick="parseAndCompileScript()">Compile Code Engine</button>
+<button class="btn btn-primary" style="background:#475569" onclick="saveToStorage()">Save Script</button>
+<button class="btn btn-primary" style="background:#475569" onclick="parseAndCompileScript()">Compile Code</button>
 </div>
 <button class="btn btn-s-mode" id="runScriptButton" onclick="executeSModeTransferEngine()" disabled>DRAW / RUN CUSTOM SCRIPT</button>
 </div>
@@ -44,12 +48,13 @@ let bleWriteQueue = Promise.resolve();
 let webCubeMode = "NONE";
 
 function updateSModeUI(){
-  document.getElementById("runScriptButton").disabled = (webCubeMode !== "S" || !targetDataCharacteristic);
+  document.getElementById("runScriptButton").disabled = (webCubeMode !== "S" || !targetDataCharacteristic || scriptFrames.length === 0);
 }
 
 window.addEventListener("DOMContentLoaded", () => {
   const cached = localStorage.getItem("cube_cached_script_layer");
   if(cached) document.getElementById("scriptIDE").value = cached;
+  parseAndCompileScript();
   updateSModeUI();
 });
 
@@ -79,6 +84,31 @@ function parseDelayCommand(line){
   if(!m) return null;
   const value = parseInt(m[1], 10);
   return Number.isFinite(value) ? Math.max(0, value) : null;
+}
+
+function drawPreview(frameBytes){
+  const canvas = document.getElementById("layerPreviewCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  const cellW = canvas.width / 8;
+  const cellH = canvas.height / 8;
+
+  for(let y = 0; y < 8; y++){
+    for(let x = 0; x < 8; x++){
+      // Preview Layer 0 (z = 0)
+      const index = 0 * 64 + y * 8 + x;
+      const byteIndex = index >> 3;
+      const bitIndex = index & 7;
+      const isOn = (frameBytes[byteIndex] & (1 << bitIndex)) !== 0;
+
+      if(isOn){
+        ctx.fillStyle = "#51ff00";
+        ctx.fillRect(x * cellW + 1, y * cellH + 1, cellW - 2, cellH - 2);
+      }
+    }
+  }
 }
 
 function parseAndCompileScript(){
@@ -145,8 +175,13 @@ function parseAndCompileScript(){
   }
 
   if(hasCommands) pushFrame();
-  document.getElementById("runScriptButton").disabled = !(webCubeMode === "S" && targetDataCharacteristic && scriptFrames.length);
-  return scriptFrames.length;
+  
+  const count = scriptFrames.length;
+  document.getElementById("frameCountLabel").innerText = count + " Frame(s) Compiled";
+  if(count > 0) drawPreview(scriptFrames[0].bytes);
+  
+  updateSModeUI();
+  return count;
 }
 
 async function connectBLE(){
@@ -358,6 +393,7 @@ async function executeSModeTransferEngine(){
     while(scriptPlaybackRunning && token === scriptPlaybackToken && webCubeMode === "S"){
       for(const frame of scriptFrames){
         if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") break;
+        drawPreview(frame.bytes);
         const ok = await sendSingleScriptFrame(frame.bytes, token);
         if(!ok) break;
         await new Promise(r => setTimeout(r, frame.delay));
