@@ -542,10 +542,9 @@
             if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") return false;
 
             const layerData = frameBytes.slice(layer * 8, (layer + 1) * 8);
-            const packet = new Uint8Array(10);
-            packet[0] = 0xFF;
-            packet[1] = layer;
-            packet.set(layerData, 2);
+            const packet = new Uint8Array(9);
+            packet[0] = (1 << layer);
+            packet.set(layerData, 1);
 
             await queueBLEWrite(packet, token);
             await new Promise(r => setTimeout(r, 2));
