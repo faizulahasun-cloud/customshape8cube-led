@@ -325,7 +325,7 @@ async function enterSMode(){
 
   try{
     await bleWriteQueue.catch(() => {});
-    const packet = new Uint8Array([0xFF, 0x53, 0x00]);
+    const packet = new Uint8Array([0xFF, 0x53]);
     await queueBLEWrite(packet);
 
     if(targetDataCharacteristic && webCubeMode === "S"){
