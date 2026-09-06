@@ -1,0 +1,14 @@
+CUSTOM
+DX=X-3.5
+DY=Y-3.5
+A=F*0.25
+RX=DX*cos(A)+DY*sin(A)
+RY=-DX*sin(A)+DY*cos(A)
+U=RX*RX+RY*RY
+V=U-1
+W=V*V*V
+H=RX*RX*RY*RY*RY
+IF W-H>0 OFF
+Z=3
+Z=4
+END
