@@ -38,7 +38,6 @@ const ColumnMap COLUMN_MAP[64] = {
 };
 inline byte columnIndex(byte x, byte y){ return y*8+x; }
 
-// Atomic display-buffer helpers. The refresh ISR must never see a half-written frame.
 void copyFrameToDisplay(const byte source[8][8]){
   noInterrupts();
   memcpy((void*)displayBuffer, source, 64);
@@ -57,7 +56,6 @@ void triggerModeBlinkAcknowledgment(){
   delay(80);
 }
 
-// Bluetooth protocol: one command has one unambiguous meaning and receives a unique ACK.
 // H=handshake, A=auto, M=manual, N=next animation, Y=begin math upload, F=start math,
 // C=begin custom upload, X=start custom, S=stop custom, B=brightness + one byte value.
 void sendAck(const __FlashStringHelper *msg){ bluetooth.println(msg); }
@@ -69,13 +67,10 @@ enum MathOp : byte {
   M_LT, M_LE, M_GT, M_GE, M_EQ, M_NE, M_AND, M_OR
 };
 
-// Four-byte packed instruction. Constants keep their exact IEEE-754 bits;
-// non-constant opcodes use quiet-NaN payloads.
 struct MathInstr { uint32_t code; };
 MathInstr mathProgram[96];
 byte mathProgramLength=0;
 bool mathProgramValid=false;
-// 512 bytes is enough for the supported text protocol while materially reducing SRAM use.
 char rxBuffer[512];
 byte rxLength=0;
 
@@ -236,7 +231,12 @@ bool compileCustomSource(){
       for(byte k=1;k<lhs.length()&&validName;k++){char q=lhs[k];if(!((q>='A'&&q<='Z')||(q>='a'&&q<='z')||(q>='0'&&q<='9')||q=='_'))validName=false;}
       if(!validName){parseError=true;continue;}
       String rhs=line.substring(eq+1);rhs.trim();
-      if(lhs=="Z") { int orPos=rhs.indexOf(" OR "); if(orPos>=0){while(orPos>=0){String part=rhs.substring(0,orPos);if(!appendCustomZCondition(zExpr,part))parseError=true;rhs=rhs.substring(orPos+4);orPos=rhs.indexOf(" OR ");}if(rhs.length()&&!appendCustomZCondition(zExpr,rhs))parseError=true;} else if(!appendCustomZCondition(zExpr,rhs))parseError=true; haveGeometry=true; }
+      if(lhs=="Z"){
+        int orPos=rhs.indexOf(" OR ");
+        while(orPos>=0){String part=rhs.substring(0,orPos);part.trim();if(part.startsWith("Z="))part=part.substring(2);part.trim();if(!appendCustomZCondition(zExpr,part))parseError=true;rhs=rhs.substring(orPos+4);rhs.trim();orPos=rhs.indexOf(" OR ");}
+        if(rhs.startsWith("Z="))rhs=rhs.substring(2);rhs.trim();if(!rhs.length()||!appendCustomZCondition(zExpr,rhs))parseError=true;
+        haveGeometry=true;
+      }
       continue;
     }
     if(!appendCustomCondition(finalExpr,line))parseError=true; else haveGeometry=true;
@@ -284,82 +284,16 @@ bool firecrackerVoxel(byte f,byte x,byte y,byte z){
   byte burstF=f-16,d=burstF/3;if(d>3)d=3;if(z!=7)return false;int vx=(int)x-3,vy=(int)y-3;if(vx==0&&vy==0)return d==0;if(!(vx==0||vy==0||abs(vx)==abs(vy)))return false;return max(abs(vx),abs(vy))==(int)d;
 }
 
-// Closed 50-frame 3D walk. Frame 49 is adjacent to frame 0, so the loop is continuous.
 const byte SNAKE_DIRS[49] PROGMEM={0,5,1,1,5,1,2,4,2,0,0,2,5,2,5,1,4,1,1,5,3,3,0,0,3,1,3,4,4,2,4,0,0,2,4,3,4,4,2,5,5,3,3,1,2,2,0,3,5};
-void snakePosition(byte step,byte &sx,byte &sy,byte &sz){
-  int8_t px=3,py=3,pz=3;
-  for(byte s=0;s<step;s++){byte d=pgm_read_byte(&SNAKE_DIRS[s%49]);if(d==0)px++;else if(d==1)px--;else if(d==2)py++;else if(d==3)py--;else if(d==4)pz++;else pz--;}
-  sx=(byte)px;sy=(byte)py;sz=(byte)pz;
-}
-bool snakeVoxel(byte f,byte x,byte y,byte z){
-  for(byte k=0;k<8;k++){
-    byte step=(byte)((f+50-k)%50);byte sx,sy,sz;snakePosition(step,sx,sy,sz);
-    if(x==sx&&y==sy&&z==sz)return true;
-  }
-  return false;
-}
+void snakePosition(byte step,byte &sx,byte &sy,byte &sz){int8_t px=3,py=3,pz=3;for(byte s=0;s<step;s++){byte d=pgm_read_byte(&SNAKE_DIRS[s%49]);if(d==0)px++;else if(d==1)px--;else if(d==2)py++;else if(d==3)py--;else if(d==4)pz++;else pz--;}sx=(byte)px;sy=(byte)py;sz=(byte)pz;}
+bool snakeVoxel(byte f,byte x,byte y,byte z){for(byte k=0;k<8;k++){byte step=(byte)((f+50-k)%50);byte sx,sy,sz;snakePosition(step,sx,sy,sz);if(x==sx&&y==sy&&z==sz)return true;}return false;}
 
-// Front-facing heart: the front face is y=0, so the heart is drawn in X-Z.
 const byte HEART_MASK[8]={0x66,0xFF,0xFF,0x7E,0x3C,0x18,0x18,0x00};
-bool rotatingHeartVoxel(byte f,byte x,byte y,byte z){
-  if(y!=0&&y!=1)return false;byte r=(f/4)%4,u,v;
-  if(r==0){u=x;v=z;}else if(r==1){u=z;v=7-x;}else if(r==2){u=7-x;v=7-z;}else{u=7-z;v=x;}
-  return (HEART_MASK[v]&(1<<u))!=0;
-}
+bool rotatingHeartVoxel(byte f,byte x,byte y,byte z){if(y!=0&&y!=1)return false;byte r=(f/4)%4,u,v;if(r==0){u=x;v=z;}else if(r==1){u=z;v=7-x;}else if(r==2){u=7-x;v=7-z;}else{u=7-z;v=x;}return (HEART_MASK[v]&(1<<u))!=0;}
 
-bool animationVoxel(byte a,byte f,byte x,byte y,byte z){
-  if(a==0)return z==(f%8);if(a==1)return z==(7-(f%8));if(a==2)return x==(f%8);if(a==3)return y==(f%8);if(a==4)return x==y&&y==z&&x==(f%8);if(a==5)return x==y&&z==(7-x)&&x==(f%8);if(a==6)return ((x+y+z+f)&1)==0;if(a==7){byte r=f%5;int d=max(abs((int)x-3),max(abs((int)y-3),abs((int)z-3)));return d==r;}if(a==8){byte r=4-(f%5);int d=max(abs((int)x-3),max(abs((int)y-3),abs((int)z-3)));return d==r;}if(a==9){if(!(x==3||x==4||y==3||y==4||z==3||z==4))return false;return ((x+y+z+f)&1)==0;}if(a==10){byte w=(x+y+f)%8;return z==w||z==((w+1)%8);}if(a==11){byte ss=(f/2)%8;if(ss==0)return x==0;if(ss==1)return y==7;if(ss==2)return x==7;return y==0;}if(a==12){if(!isOuterRing(x,y))return false;byte p=perimeterIndex(x,y);return ((p+f)%28)<3;}if(a==13){if(!isOuterRing(x,y))return false;byte p=perimeterIndex(x,y);return z==((p+f)%8);}if(a==14){byte h=(x*3+y*5+f)%16;if(h>=8)return false;byte rz=7-h;return z==rz||(rz<7&&z==rz+1);}if(a==15){int dx=abs((int)x-3),dy=abs((int)y-3);if(dx<=1&&dy<=1){if(z>((f/2)%8))return false;return ((x+y+f)&1)!=0;}return false;}if(a==16){if(!isOuterRing(x,y))return false;byte p=perimeterIndex(x,y),o=(p+f)%28;return z==(o%8)||z==((o+1)%8);}if(a==17){if(!isOuterRing(x,y))return false;byte p=perimeterIndex(x,y);return z==((p+f)%8);}if(a==18){byte r=f%8;int d=abs((int)x-3)+abs((int)y-3)+abs((int)z-3);return d==r||d==r+1;}if(a==19){byte r=f%10;int d=min(abs((int)x-3),abs((int)x-4))+min(abs((int)y-3),abs((int)y-4))+min(abs((int)z-3),abs((int)z-4));return d==r||d==r+1;}if(a==20){byte r=9-(f%10);int d=min(abs((int)x-3),abs((int)x-4))+min(abs((int)y-3),abs((int)y-4))+min(abs((int)z-3),abs((int)z-4));return d==r||d==r+1;}if(a==21){int d=abs((int)x-3)+abs((int)y-3)+abs((int)z-3);return ((d+f)%4)<2;}if(a==22)return ((x+y+z+f)%8)==0;if(a==23){if(!((x==0||x==7)&&(y==0||y==7)&&(z==0||z==7)))return false;byte c=((z==7)?4:0)+((y==7)?2:0)+((x==7)?1:0);return c==(f%8);}if(a==24)return firecrackerVoxel(f,x,y,z);if(a==25)return snakeVoxel(f,x,y,z);if(a==26)return rotatingHeartVoxel(f,x,y,z);return false;
-}
-
-void drawAnimationFrame(byte a,byte f){
-  byte localMatrix[8][8];
-  for(byte z=0;z<8;z++){for(byte r=0;r<8;r++)localMatrix[z][r]=0;for(byte y=0;y<8;y++)for(byte x=0;x<8;x++)if(animationVoxel(a,f,x,y,z)){byte c=columnIndex(x,y),reg=COLUMN_MAP[c].reg,bit=COLUMN_MAP[c].bit;if(reg>=1&&reg<=8&&bit<=7)localMatrix[z][reg-1]|=(1<<bit);}}
-  copyFrameToDisplay(localMatrix);
-}
-
+bool animationVoxel(byte a,byte f,byte x,byte y,byte z){if(a==0)return z==(f%8);if(a==1)return z==(7-(f%8));if(a==2)return x==(f%8);if(a==3)return y==(f%8);if(a==4)return x==y&&y==z&&x==(f%8);if(a==5)return x==y&&z==(7-x)&&x==(f%8);if(a==6)return ((x+y+z+f)&1)==0;if(a==7){byte r=f%5;int d=max(abs((int)x-3),max(abs((int)y-3),abs((int)z-3)));return d==r;}if(a==8){byte r=4-(f%5);int d=max(abs((int)x-3),max(abs((int)y-3),abs((int)z-3)));return d==r;}if(a==9){if(!(x==3||x==4||y==3||y==4||z==3||z==4))return false;return ((x+y+z+f)&1)==0;}if(a==10){byte w=(x+y+f)%8;return z==w||z==((w+1)%8);}if(a==11){byte ss=(f/2)%8;if(ss==0)return x==0;if(ss==1)return y==7;if(ss==2)return x==7;return y==0;}if(a==12){if(!isOuterRing(x,y))return false;byte p=perimeterIndex(x,y);return ((p+f)%28)<3;}if(a==13){if(!isOuterRing(x,y))return false;byte p=perimeterIndex(x,y);return z==((p+f)%8);}if(a==14){byte h=(x*3+y*5+f)%16;if(h>=8)return false;byte rz=7-h;return z==rz||(rz<7&&z==rz+1);}if(a==15){int dx=abs((int)x-3),dy=abs((int)y-3);if(dx<=1&&dy<=1){if(z>((f/2)%8))return false;return ((x+y+f)&1)!=0;}return false;}if(a==16){if(!isOuterRing(x,y))return false;byte p=perimeterIndex(x,y),o=(p+f)%28;return z==(o%8)||z==((o+1)%8);}if(a==17){if(!isOuterRing(x,y))return false;byte p=perimeterIndex(x,y);return z==((p+f)%8);}if(a==18){byte r=f%8;int d=abs((int)x-3)+abs((int)y-3)+abs((int)z-3);return d==r||d==r+1;}if(a==19){byte r=f%10;int d=min(abs((int)x-3),abs((int)x-4))+min(abs((int)y-3),abs((int)y-4))+min(abs((int)z-3),abs((int)z-4));return d==r||d==r+1;}if(a==20){byte r=9-(f%10);int d=min(abs((int)x-3),abs((int)x-4))+min(abs((int)y-3),abs((int)y-4))+min(abs((int)z-3),abs((int)z-4));return d==r||d==r+1;}if(a==21){int d=abs((int)x-3)+abs((int)y-3)+abs((int)z-3);return ((d+f)%4)<2;}if(a==22)return ((x+y+z+f)%8)==0;if(a==23){if(!((x==0||x==7)&&(y==0||y==7)&&(z==0||z==7)))return false;byte c=((z==7)?4:0)+((y==7)?2:0)+((x==7)?1:0);return c==(f%8);}if(a==24)return firecrackerVoxel(f,x,y,z);if(a==25)return snakeVoxel(f,x,y,z);if(a==26)return rotatingHeartVoxel(f,x,y,z);return false;}
+void drawAnimationFrame(byte a,byte f){byte localMatrix[8][8];for(byte z=0;z<8;z++){for(byte r=0;r<8;r++)localMatrix[z][r]=0;for(byte y=0;y<8;y++)for(byte x=0;x<8;x++)if(animationVoxel(a,f,x,y,z)){byte c=columnIndex(x,y),reg=COLUMN_MAP[c].reg,bit=COLUMN_MAP[c].bit;if(reg>=1&&reg<=8&&bit<=7)localMatrix[z][reg-1]|=(1<<bit);}}copyFrameToDisplay(localMatrix);}
 void setup(){pinMode(DATA_PIN,OUTPUT);pinMode(CLOCK_PIN,OUTPUT);pinMode(LATCH_PIN,OUTPUT);pinMode(TOUCH_PIN,INPUT);pinMode(BLE_STATE_PIN,INPUT);PORTB&=~(_BV(PB3)|_BV(PB4)|_BV(PB5));bluetooth.begin(9600);mathProgramValid=false;customReady=false;startRefreshTimer();animationStart=millis();lastFrameTime=millis();}
-
-void loop(){
-  unsigned long now=millis();bool ble=digitalRead(BLE_STATE_PIN)==HIGH;
-  if(ble!=lastBluetoothConnected){if(bluetoothStateChangedAt==0)bluetoothStateChangedAt=now;else if(now-bluetoothStateChangedAt>=BLE_STATE_DEBOUNCE_TIME){lastBluetoothConnected=ble;bluetoothStateChangedAt=0;if(!lastBluetoothConnected){currentCubeMode=0;parseMode=0;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();}}}else bluetoothStateChangedAt=0;
-  if(!lastBluetoothConnected)globalBrightness=map(analogRead(POT_PIN),0,1023,2,8);
-  static bool lastTouch=false;static unsigned long touchTimer=0;static bool longPress=false;bool touch=digitalRead(TOUCH_PIN)==HIGH;if(lastBluetoothConnected)touch=false;
-  // Touch contract: short press in Manual = next animation; long press = toggle Auto/Manual.
-  if(touch&&!lastTouch){touchTimer=now;longPress=false;}
-  else if(touch&&lastTouch){unsigned long d=now-touchTimer;if(!longPress&&d>=3000UL){currentCubeMode=(currentCubeMode==0)?1:0;triggerModeBlinkAcknowledgment();longPress=true;animationStart=now;lastFrameTime=now;}}
-  else if(!touch&&lastTouch){unsigned long d=now-touchTimer;if(!longPress&&currentCubeMode==1&&d>=50&&d<3000UL){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);}}
-  lastTouch=touch;
-
-  while(bluetooth.available()>0){byte in=bluetooth.read();
-    if(parseMode==5){parseCustomFunctionStream((char)in);continue;}
-    if(parseMode==6){
-      if(in=='\n'||in=='\r'){
-        if(rxLength>0){
-          rxBuffer[rxLength]='\0';
-          if(compileExpression(rxBuffer)){currentCubeMode=3;animationStart=now;lastFrameTime=now;frameCounter=0;sendAck(F("MATH_OK"));}
-          else{mathProgramValid=false;currentCubeMode=0;animationStart=now;lastFrameTime=now;sendAck(F("MATH_ERROR"));}
-          rxLength=0;parseMode=0;
-        }
-      }else if(rxLength<sizeof(rxBuffer)-1){rxBuffer[rxLength++]=(char)in;rxBuffer[rxLength]='\0';}
-      else{rxLength=0;parseMode=0;mathProgramValid=false;sendAck(F("MATH_ERROR"));}
-      continue;
-    }
-    if(parseMode==0){
-      if(in=='A'){currentCubeMode=0;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MODE_AUTO"));}
-      else if(in=='M'){currentCubeMode=1;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MODE_MANUAL"));}
-      else if(in=='Y'){parseMode=6;rxLength=0;sendAck(F("MATH_UPLOAD_READY"));}
-      else if(in=='F'){if(mathProgramValid){currentCubeMode=3;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MATH_STARTED"));}else sendAck(F("MATH_NOT_READY"));}
-      else if(in=='C'){parseMode=5;resetCustomReceive();sendAck(F("CUSTOM_UPLOAD_READY"));}
-      else if(in=='X'){if(customReady){currentCubeMode=4;animationStart=now;lastFrameTime=now;frameCounter=0;triggerModeBlinkAcknowledgment();sendAck(F("CUSTOM_STARTED"));}else sendAck(F("CUSTOM_NOT_READY"));}
-      else if(in=='S'){if(currentCubeMode==4||customReady){currentCubeMode=0;animationStart=now;lastFrameTime=now;frameCounter=0;sendAck(F("CUSTOM_STOPPED"));}else sendAck(F("CUSTOM_NOT_ACTIVE"));}
-      else if(in=='H'){sendAck(F("HANDSHAKE_OK"));}
-      else if(in=='N'&&currentCubeMode==1){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);sendAck(F("ANIMATION_NEXT"));}
-      else if(in=='B')parseMode=4;
-    }
-    else if(parseMode==4){if(in>=2&&in<=8){globalBrightness=in;sendAck(F("BRIGHTNESS_OK"));}else sendAck(F("BRIGHTNESS_ERROR"));parseMode=0;}
-  }
-  if(currentCubeMode==0){if(now-animationStart>=AUTO_MODE_CAROUSEL_TIME){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;}if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);frameCounter=(frameCounter+1)%50;}}
-  else if(currentCubeMode==1){if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);frameCounter=(frameCounter+1)%50;}}
-  else if(currentCubeMode==3){if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawMathFrame(frameCounter);frameCounter=(frameCounter+1)%50;}}
-  else if(currentCubeMode==4){if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawCustomFunctionFrame(frameCounter);frameCounter=(frameCounter+1)%50;}}
-}
+void loop(){unsigned long now=millis();bool ble=digitalRead(BLE_STATE_PIN)==HIGH;if(ble!=lastBluetoothConnected){if(bluetoothStateChangedAt==0)bluetoothStateChangedAt=now;else if(now-bluetoothStateChangedAt>=BLE_STATE_DEBOUNCE_TIME){lastBluetoothConnected=ble;bluetoothStateChangedAt=0;if(!lastBluetoothConnected){currentCubeMode=0;parseMode=0;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();}}}else bluetoothStateChangedAt=0;if(!lastBluetoothConnected)globalBrightness=map(analogRead(POT_PIN),0,1023,2,8);static bool lastTouch=false;static unsigned long touchTimer=0;static bool longPress=false;bool touch=digitalRead(TOUCH_PIN)==HIGH;if(lastBluetoothConnected)touch=false;if(touch&&!lastTouch){touchTimer=now;longPress=false;}else if(touch&&lastTouch){unsigned long d=now-touchTimer;if(!longPress&&d>=3000UL){currentCubeMode=(currentCubeMode==0)?1:0;triggerModeBlinkAcknowledgment();longPress=true;animationStart=now;lastFrameTime=now;}}else if(!touch&&lastTouch){unsigned long d=now-touchTimer;if(!longPress&&currentCubeMode==1&&d>=50&&d<3000UL){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);}}lastTouch=touch;
+  while(bluetooth.available()>0){byte in=bluetooth.read();if(parseMode==5){parseCustomFunctionStream((char)in);continue;}if(parseMode==6){if(in=='\n'||in=='\r'){if(rxLength>0){rxBuffer[rxLength]='\0';if(compileExpression(rxBuffer)){currentCubeMode=3;animationStart=now;lastFrameTime=now;frameCounter=0;sendAck(F("MATH_OK"));}else{mathProgramValid=false;currentCubeMode=0;animationStart=now;lastFrameTime=now;sendAck(F("MATH_ERROR"));}rxLength=0;parseMode=0;}}else if(rxLength<sizeof(rxBuffer)-1){rxBuffer[rxLength++]=(char)in;rxBuffer[rxLength]='\0';}else{rxLength=0;parseMode=0;mathProgramValid=false;sendAck(F("MATH_ERROR"));}continue;}if(parseMode==0){if(in=='A'){currentCubeMode=0;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MODE_AUTO"));}else if(in=='M'){currentCubeMode=1;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MODE_MANUAL"));}else if(in=='Y'){parseMode=6;rxLength=0;sendAck(F("MATH_UPLOAD_READY"));}else if(in=='F'){if(mathProgramValid){currentCubeMode=3;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MATH_STARTED"));}else sendAck(F("MATH_NOT_READY"));}else if(in=='C'){parseMode=5;resetCustomReceive();sendAck(F("CUSTOM_UPLOAD_READY"));}else if(in=='X'){if(customReady){currentCubeMode=4;animationStart=now;lastFrameTime=now;frameCounter=0;triggerModeBlinkAcknowledgment();sendAck(F("CUSTOM_STARTED"));}else sendAck(F("CUSTOM_NOT_READY"));}else if(in=='S'){if(currentCubeMode==4||customReady){currentCubeMode=0;animationStart=now;lastFrameTime=now;frameCounter=0;sendAck(F("CUSTOM_STOPPED"));}else sendAck(F("CUSTOM_NOT_ACTIVE"));}else if(in=='H'){sendAck(F("HANDSHAKE_OK"));}else if(in=='N'&&currentCubeMode==1){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);sendAck(F("ANIMATION_NEXT"));}else if(in=='B')parseMode=4;}else if(parseMode==4){if(in>=2&&in<=8){globalBrightness=in;sendAck(F("BRIGHTNESS_OK"));}else sendAck(F("BRIGHTNESS_ERROR"));parseMode=0;}}
+  if(currentCubeMode==0){if(now-animationStart>=AUTO_MODE_CAROUSEL_TIME){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;}if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);frameCounter=(frameCounter+1)%50;}}else if(currentCubeMode==1){if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);frameCounter=(frameCounter+1)%50;}}else if(currentCubeMode==3){if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawMathFrame(frameCounter);frameCounter=(frameCounter+1)%50;}}else if(currentCubeMode==4){if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawCustomFunctionFrame(frameCounter);frameCounter=(frameCounter+1)%50;}}}
