@@ -1,0 +1,14 @@
+CUSTOM
+DX=X-3.5
+DZ=Z-3.5
+A=F*0.22
+RX=DX*cos(A)+DZ*sin(A)
+RZ=-DX*sin(A)+DZ*cos(A)
+S1=abs(RX)<0.7&&RZ>-2.2&&RZ<1.6
+S2=abs(RZ-1.6)<0.55&&abs(RX)<2.5
+S3=RZ<-0.8&&abs(RX)>1.0&&abs(RX)<2.8
+S=S1||S2||S3
+IF !S OFF
+Y=3
+Y=4
+END
