@@ -51,15 +51,20 @@ enum MathOp : byte {
   M_LT, M_LE, M_GT, M_GE, M_EQ, M_NE, M_AND, M_OR
 };
 
-struct MathInstr { byte op; float value; };
+// Packed instruction: 4 bytes instead of the old 5-byte {byte,float} pair.
+// Finite float constants are stored unchanged. Non-constant opcodes are
+// encoded as quiet-NaN bit patterns; the parser never accepts NaN/Inf literals.
+struct MathInstr { uint32_t code; };
 MathInstr mathProgram[96];
 byte mathProgramLength=0;
 bool mathProgramValid=false;
 
-// One function at a time. This is a practical AVR source-buffer limit,
-// not a limit on what geometric shape can be described.
 char rxBuffer[640];
 byte rxLength=0;
+
+inline uint32_t floatBits(float value){ union { float f; uint32_t u; } v; v.f=value; return v.u; }
+inline float bitsFloat(uint32_t value){ union { float f; uint32_t u; } v; v.u=value; return v.f; }
+inline bool isPackedOp(uint32_t code){ return (code & 0x7FC00000UL)==0x7FC00000UL; }
 
 int mathPrecedence(byte op){
   if(op==M_OR) return 1;
@@ -75,8 +80,7 @@ bool mathRightAssociative(byte op){ return op==M_NEG || op==M_NOT; }
 
 bool mathEmit(byte op, float value=0.0f){
   if(mathProgramLength>=95) return false;
-  mathProgram[mathProgramLength].op=op;
-  mathProgram[mathProgramLength].value=value;
+  mathProgram[mathProgramLength].code=(op==M_CONST)?floatBits(value):(0x7FC00000UL|(uint32_t)op);
   mathProgramLength++;
   return true;
 }
@@ -208,10 +212,11 @@ bool evaluateExpression(byte x, byte y, byte z, byte f){
   byte sp=0;
 
   for(byte i=0;i<mathProgramLength;i++){
-    byte op=mathProgram[i].op;
+    uint32_t code=mathProgram[i].code;
+    byte op=isPackedOp(code)?(byte)(code&0xFF):M_CONST;
     if(op==M_END) break;
 
-    if(op==M_CONST){ if(sp>=32) return false; stack[sp++]=mathProgram[i].value; continue; }
+    if(op==M_CONST){ if(sp>=32) return false; stack[sp++]=bitsFloat(code); continue; }
     if(op==M_X || op==M_Y || op==M_Z || op==M_F){
       if(sp>=32) return false;
       stack[sp++]=(op==M_X)?x:(op==M_Y)?y:(op==M_Z)?z:f;
@@ -249,8 +254,6 @@ bool evaluateExpression(byte x, byte y, byte z, byte f){
 }
 
 // ---------------- CUSTOM FUNCTION SOURCE ----------------
-// The entire custom function is received first, then compiled once. This
-// supports the legacy variable/IF/Z syntax and also RETURN/SHOW/VOXEL expr.
 bool customReady=false;
 
 String getBufferLine(unsigned int start, unsigned int end){
@@ -448,8 +451,6 @@ void startRefreshTimer(){
 inline bool isOuterRing(byte x,byte y){ return x==0||x==7||y==0||y==7; }
 byte perimeterIndex(byte x,byte y){ if(y==0)return x; if(x==7)return 7+y; if(y==7)return 21-x; return 21+(7-y); }
 
-// Built-in animation 24: firecracker / firework. It launches from the
-// lower centre, reaches the top, then expands as an 8-ray burst.
 bool firecrackerVoxel(byte f,byte x,byte y,byte z){
   if(f<16){
     byte launchZ=f/2;
@@ -472,33 +473,29 @@ bool firecrackerVoxel(byte f,byte x,byte y,byte z){
   return max(abs(vx),abs(vy))==(int)d;
 }
 
-// Deterministic pseudo-random 3D walk. It is reconstructed from the frame,
-// so no RAM path table is needed on the Uno. The body follows the last 8 steps.
+// Closed, deterministic 3D walk. The path is stored as directions in flash,
+// so it uses no SRAM path table. The final point is adjacent to the first,
+// making the 50-frame loop continuous instead of jumping back to frame 0.
+const byte SNAKE_DIRS[49] PROGMEM = {
+  0,5,1,1,5,1,2,4,2,0,0,2,5,2,5,1,4,1,1,5,3,3,0,0,3,
+  1,3,4,4,2,4,0,0,2,4,3,4,4,2,5,5,3,3,1,2,2,0,3,5
+};
+
 void snakePosition(byte step,byte &sx,byte &sy,byte &sz){
   int8_t px=3,py=3,pz=3;
   byte previous=255;
-  byte seed=0x5A;
-
   for(byte s=0;s<step;s++){
-    seed=(byte)(seed*109u+89u);
-    byte first=(byte)((seed+s*13u)%6u);
-    bool moved=false;
-    for(byte tries=0;tries<6;tries++){
-      byte d=(first+tries)%6;
-      if(previous!=255 && d==(previous^1)) continue;
-      int8_t nx=px,ny=py,nz=pz;
-      if(d==0) nx++;
-      else if(d==1) nx--;
-      else if(d==2) ny++;
-      else if(d==3) ny--;
-      else if(d==4) nz++;
-      else nz--;
-      if(nx<0||nx>7||ny<0||ny>7||nz<0||nz>7) continue;
-      px=nx; py=ny; pz=nz; previous=d; moved=true; break;
-    }
-    if(!moved) break;
+    byte d=pgm_read_byte(&SNAKE_DIRS[s%49]);
+    int8_t nx=px,ny=py,nz=pz;
+    if(d==0) nx++;
+    else if(d==1) nx--;
+    else if(d==2) ny++;
+    else if(d==3) ny--;
+    else if(d==4) nz++;
+    else nz--;
+    if(nx<0||nx>7||ny<0||ny>7||nz<0||nz>7) break;
+    px=nx; py=ny; pz=nz; previous=d;
   }
-
   sx=(byte)px; sy=(byte)py; sz=(byte)pz;
 }
 
@@ -506,23 +503,26 @@ bool snakeVoxel(byte f,byte x,byte y,byte z){
   byte length=(f<7)?(f+1):8;
   for(byte k=0;k<length;k++){
     byte sx,sy,sz;
-    snakePosition((byte)(f-k),sx,sy,sz);
+    byte step=(byte)(f-k);
+    snakePosition(step,sx,sy,sz);
     if(x==sx && y==sy && z==sz) return true;
   }
   return false;
 }
 
-// 8x8 heart mask. It is two layers thick and rotates around the central Z axis.
+// Front-facing 8x8 heart. Front is y=0 (columns 1-8), so the heart lies in
+// the X-Z plane and is two layers deep in Y. Its original four-way rotation
+// logic is preserved, with Y replaced by Z and Z-thickness moved to Y.
 const byte HEART_MASK[8]={0x66,0xFF,0xFF,0x7E,0x3C,0x18,0x18,0x00};
 
 bool rotatingHeartVoxel(byte f,byte x,byte y,byte z){
-  if(z!=3 && z!=4) return false;
+  if(y!=0 && y!=1) return false;
   byte r=(f/4)%4;
   byte u,v;
-  if(r==0){ u=x; v=y; }
-  else if(r==1){ u=y; v=7-x; }
-  else if(r==2){ u=7-x; v=7-y; }
-  else { u=7-y; v=x; }
+  if(r==0){ u=x; v=z; }
+  else if(r==1){ u=z; v=7-x; }
+  else if(r==2){ u=7-x; v=7-z; }
+  else { u=7-z; v=x; }
   return (HEART_MASK[v] & (1<<u))!=0;
 }
 
