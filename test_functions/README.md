@@ -2,6 +2,25 @@
 
 These files are copy/paste test cases for the browser Custom Function editor and Math Function editor.
 
+## Custom Function engine
+
+The cube receives **one custom program at a time**. The browser sends the program source once over BLE; the Arduino compiles it locally and then evaluates the compiled expression for all 512 voxels on every frame. It does **not** receive 512 bits for every frame.
+
+Custom is geometry-neutral. There is no fixed list of shapes. A program can describe planes, curves, spheres, shells, particles, rotations, intersections, unions, waves, conditional motion, or combinations of them using the available expression operations.
+
+Supported custom structure:
+- `CUSTOM` / `END` delimit the program.
+- `X`, `Y`, `Z`, `F` are the voxel coordinates and animation frame.
+- Helper variables can be assigned with `NAME=expression` and may reference variables defined later.
+- `IF condition OFF` keeps voxels where the condition is false.
+- `IF condition ON` keeps voxels where the condition is true.
+- `ON IF condition` and `OFF IF condition` are also accepted.
+- A plain expression line is treated as an ON condition.
+- `Z=expression` or multiple `Z=... OR Z=...` rules select allowed layers.
+- Arithmetic: `+ - * / %`, comparisons, `&& || !`, and `sin`, `cos`, `sqrt`, `abs`.
+
+The only limits are practical AVR resources (program/source size and helper-variable storage), not a predefined shape or animation list. Since only one function is active at a time, a new function replaces the previous custom program after it successfully compiles.
+
 ## Custom Function files
 - `custom/01_diagonal_wave.txt` — moving diagonal wave
 - `custom/02_center_pulse.txt` — pulsing center sphere
@@ -21,9 +40,7 @@ These files are copy/paste test cases for the browser Custom Function editor and
 - `math/05_nested_wave.txt` — combined sine/cosine field
 
 ## Test method
-1. Copy one file's contents into the corresponding editor in the web app.
-2. Compile/send the function.
-3. Start it with the normal Run/Start control.
-4. The same mathematical meaning should be reproduced by the Arduino engine.
-
-These tests cover arithmetic, variables, comparisons, boolean operators, trigonometry, 3D geometry, rotation, and animation over `F`.
+1. Copy one file into the corresponding web editor.
+2. For Custom, press **Send Function** and wait for **CUSTOM FUNCTION READY**.
+3. Press **Start Custom**.
+4. Only the selected function runs; functions are not queued or combined.
