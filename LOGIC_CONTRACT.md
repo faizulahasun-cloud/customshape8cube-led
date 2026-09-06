@@ -4,24 +4,21 @@ This file records the important behavior that must NOT be accidentally removed o
 
 Before changing the Arduino or web code, check this table first.
 
-## 0. Change authorization rule — MANDATORY
+## 0. Modification authorization rule
 
-This section controls whether any repository file may be modified.
+**Analysis does not equal permission to modify.**
 
-**Analyze first. Modify only when explicitly authorized by the user.**
+Before changing any project file:
 
-1. First inspect the current file/content and determine whether a change is actually needed.
-2. The fact that a change appears useful, necessary, safer, cleaner, or implied by the project does **NOT** grant permission to modify it.
-3. A request to **analyze, inspect, check, compare, report, explain, or verify** means **NO code modification** unless the user separately and explicitly authorizes a modification.
-4. When the user authorizes a change, modify **only the file(s) and behavior explicitly authorized**, unless the user clearly authorizes related files as well.
-5. Do not modify the Arduino `.ino` merely because an MD rule says a behavior should exist. First report whether the current Arduino code already satisfies that rule; obtain explicit authorization before changing the `.ino`.
-6. Do not modify HTML, Arduino, or other project files while the user is asking only to update this contract/documentation.
-7. Before every write operation, identify the exact file being changed and confirm that the user's latest instruction authorizes that file and change.
-8. If a requested behavior is missing but the user has not authorized code changes, **report the missing behavior and stop without modifying the code**.
-9. Never treat this document as permission to implement its requirements. It is a preservation/verification contract, not an automatic change request.
-10. When a file is authorized for modification, preserve all unrelated existing functionality and make the smallest necessary change.
+1. Analyze the current Arduino/HTML content first.
+2. Identify whether a change is actually required for the user's requested task.
+3. Modify **only** the file(s) the user explicitly authorized for modification.
+4. Never modify Arduino, HTML, or another project file merely because the analysis finds an improvement, inconsistency, cleanup opportunity, or missing implementation.
+5. A rule written in this contract is a **behavior requirement**, not permission to implement or change it without user authorization.
+6. When the user says **analyze/check/report**, do not modify code.
+7. When the user authorizes an MD/document-only change, modify only that requested documentation file.
 
-**Priority rule:** User's explicit modification instruction > this contract's recommendations. This contract never overrides a user's instruction and never creates permission by itself.
+When in doubt, preserve the existing code and report the finding instead of changing it.
 
 ## 1. Main control logic
 
@@ -156,16 +153,42 @@ The refresh interrupt independently scans the cube layers and shifts data to the
 
 Animation code should update `displayBuffer`; it should not directly control the shift-register pins during normal animation rendering.
 
-## 13. Future-change checklist
+## 13. Device / user behavior contract
+
+This table describes the intended physical behavior of the finished cube and its control page. These behaviors must be preserved during future changes.
+
+| Device behavior | Required behavior | Important detail |
+|---|---|---|
+| Arduino power-up | Wait **3 seconds**, then start the cube in built-in **Auto Mode** | The delay is for capacitor / power-supply charging before normal LED scanning starts |
+| Long touch | Holding the physical touchpad for **more than 3 seconds** toggles between Auto Mode and Manual Mode | When entering Manual Mode, keep the **current animation**; do not automatically advance it |
+| Short / single touch | A normal single touch advances to the **next animation** | Only acts as Next Animation while in **Manual Mode**; it does not change animation during Auto Mode |
+| Touch while Bluetooth is connected | Physical touch input is ignored | The connected web interface controls the cube instead |
+| Brightness without Bluetooth | The physical **potentiometer** controls LED brightness | Arduino continuously reads `POT_PIN` while disconnected |
+| Brightness with Bluetooth | Web interface brightness control sends brightness to Arduino | Arduino uses the received brightness value instead of the disconnected-state potentiometer control |
+| Bluetooth connect | Web interface establishes the HM-10 session, verifies handshake, and enables controls | Existing animation state is not replaced merely by connecting |
+| Bluetooth Auto command | Selecting Auto from the web page switches Arduino to built-in Auto Mode | ACK: `MODE_AUTO` |
+| Bluetooth Manual command | Selecting Manual from the web page switches Arduino to Manual Mode | ACK: `MODE_MANUAL`; current animation remains selected |
+| Web Next command | Next Animation advances the selected built-in animation | Intended for Manual Mode; ACK: `ANIMATION_NEXT` |
+| Math mode | Web page uploads an expression, then starts Math Mode; Arduino renders the expression locally | Uses the Arduino math engine and common display pipeline |
+| Custom mode | Web page uploads a custom function, then starts Custom Mode; Arduino renders it locally | Stop returns the cube to Auto Mode |
+| Bluetooth disconnect | After the configured 3-second BLE disconnect debounce, Arduino returns to built-in Auto Mode | This is handled locally by Arduino; the web page does not need to send `A` |
+
+**Important touch rule:** a single touch is not a second way to enter Manual Mode. A long touch changes mode; a short touch performs Next Animation only when already in Manual Mode.
+
+## 14. Future-change checklist
 
 Before committing a change, verify:
 
 | Check | Must remain true |
 |---|---|
-| Authorization | Only explicitly user-authorized files/changes are modified |
-| Analyze first | Current content is inspected before deciding whether a change is needed |
-| No implicit permission | A documented requirement never by itself authorizes changing code |
+| Modification authorization | Do not modify a file unless the user explicitly authorized that file/change |
 | Startup delay | Arduino waits 3 seconds after power-up before starting built-in Auto animation |
+| Startup mode | Cube starts in built-in Auto Mode after the startup delay |
+| Long touch | More than 3 seconds toggles Auto/Manual without changing the selected animation |
+| Single touch | Short touch advances to the next animation only in Manual Mode |
+| Touch priority | Touch input is ignored while Bluetooth is connected |
+| Potentiometer | Physical potentiometer controls brightness while Bluetooth is disconnected |
+| Web brightness | Connected web control sets brightness through the `B` protocol |
 | Disconnect fallback | Bluetooth loss still returns to built-in Auto Mode |
 | Handshake | `H` still gets `HANDSHAKE_OK` reliably |
 | ACK order | Waiter is created before command is sent |
@@ -182,10 +205,6 @@ Before committing a change, verify:
 
 ## Golden rule
 
-**Analyze first. Never modify code or another project file unless the user explicitly authorizes that modification.**
+**Do not judge a future change only by whether the new feature works. Also verify that every existing rule in this document still works.**
 
-After authorization, make the smallest necessary change, preserve unrelated behavior, and verify every existing rule in this document still works.
-
-Do not judge a future change only by whether the new feature works. Also verify that every existing rule in this document still works.
-
-When modifying either file, review this contract first and specifically check for missing logic, removed fallback behavior, changed command meanings, ACK races, startup delay removal, coordinate changes, and unnecessary RAM growth.
+When modifying either file, review this contract first and specifically check for missing logic, removed fallback behavior, changed command meanings, ACK races, unauthorized file changes, startup delay removal, touch-control changes, brightness-control changes, coordinate changes, and unnecessary RAM growth.
