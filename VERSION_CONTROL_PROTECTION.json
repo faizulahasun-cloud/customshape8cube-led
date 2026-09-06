@@ -1,0 +1,17 @@
+{
+  "name": "Protect VERSION_CONTROL.md",
+  "target": "push",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {},
+  "rules": [
+    {
+      "type": "file_path_restriction",
+      "parameters": {
+        "restricted_file_paths": [
+          "VERSION_CONTROL.md"
+        ]
+      }
+    }
+  ]
+}
