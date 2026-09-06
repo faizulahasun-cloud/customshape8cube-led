@@ -1,0 +1,7 @@
+CUSTOM
+A=(F%16)/2
+B=7-A
+IF X!=A OFF
+IF Y!=B OFF
+Z=F%8
+END
