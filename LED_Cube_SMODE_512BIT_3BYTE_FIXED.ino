@@ -58,8 +58,8 @@ void triggerModeBlinkAcknowledgment(){
 }
 
 // Bluetooth protocol: one command has one unambiguous meaning and receives a unique ACK.
-// H=handshake, A=auto, M=manual, N=next animation, Y=math upload, F=start math,
-// C=custom upload, X=start custom, B=brightness + one byte value.
+// H=handshake, A=auto, M=manual, N=next animation, Y=begin math upload, F=start math,
+// C=begin custom upload, X=start custom, S=stop custom, B=brightness + one byte value.
 void sendAck(const __FlashStringHelper *msg){ bluetooth.println(msg); }
 
 enum MathOp : byte {
@@ -210,22 +210,39 @@ bool appendCustomCondition(String &finalExpr,const String &condition){
   finalExpr+="("+expanded+")";
   return true;
 }
+bool appendCustomZCondition(String &zExpr,const String &rhs){
+  String expanded=expandCustomExpression(rhs);
+  if(expanded.indexOf("__CYCLE__")>=0||expanded.indexOf("__TOO_LONG__")>=0) return false;
+  if(zExpr.length()) zExpr+="||";
+  zExpr+="(z==("+expanded+"))";
+  return true;
+}
+
 bool compileCustomSource(){
-  String finalExpr=""; bool haveReturn=false; bool parseError=false; unsigned int pos=0;
+  String finalExpr=""; String zExpr=""; bool haveGeometry=false; bool parseError=false; unsigned int pos=0;
   while(pos<rxLength){
     unsigned int start=pos; while(pos<rxLength&&rxBuffer[pos]!='\n')pos++; String line=getBufferLine(start,pos); if(pos<rxLength)pos++;
     if(!line.length()||line=="CUSTOM"||line=="CF_BEGIN"||line=="START CUSTOM"||line=="END"||line=="CF_END")continue;
-    if(line.startsWith("RETURN ")){finalExpr=expandCustomExpression(line.substring(7));haveReturn=true;break;}
-    if(line.startsWith("SHOW ")){finalExpr=expandCustomExpression(line.substring(5));haveReturn=true;break;}
-    if(line.startsWith("VOXEL ")){finalExpr=expandCustomExpression(line.substring(6));haveReturn=true;break;}
-    if(line.startsWith("IF ")){String condition=line.substring(3);condition.trim();if(condition.endsWith(" OFF")){condition.remove(condition.length()-4);condition.trim();if(!appendCustomCondition(finalExpr,"!("+condition+")"))parseError=true;}else if(condition.endsWith(" ON")){condition.remove(condition.length()-3);condition.trim();if(!appendCustomCondition(finalExpr,condition))parseError=true;}else if(!appendCustomCondition(finalExpr,condition))parseError=true;continue;}
-    if(line.startsWith("ON IF ")){if(!appendCustomCondition(finalExpr,line.substring(6)))parseError=true;continue;}
-    if(line.startsWith("OFF IF ")){if(!appendCustomCondition(finalExpr,"!("+line.substring(7)+")"))parseError=true;continue;}
+    if(line.startsWith("RETURN ")){finalExpr=expandCustomExpression(line.substring(7));haveGeometry=true;break;}
+    if(line.startsWith("SHOW ")){finalExpr=expandCustomExpression(line.substring(5));haveGeometry=true;break;}
+    if(line.startsWith("VOXEL ")){finalExpr=expandCustomExpression(line.substring(6));haveGeometry=true;break;}
+    if(line.startsWith("IF ")){String condition=line.substring(3);condition.trim();if(condition.endsWith(" OFF")){condition.remove(condition.length()-4);condition.trim();if(!appendCustomCondition(finalExpr,"!("+condition+")"))parseError=true;}else if(condition.endsWith(" ON")){condition.remove(condition.length()-3);condition.trim();if(!appendCustomCondition(finalExpr,condition))parseError=true;}else if(!appendCustomCondition(finalExpr,condition))parseError=true;haveGeometry=true;continue;}
+    if(line.startsWith("ON IF ")){if(!appendCustomCondition(finalExpr,line.substring(6)))parseError=true;haveGeometry=true;continue;}
+    if(line.startsWith("OFF IF ")){if(!appendCustomCondition(finalExpr,"!("+line.substring(7)+")"))parseError=true;haveGeometry=true;continue;}
     int eq=line.indexOf('=');
-    if(eq>0){String lhs=line.substring(0,eq);lhs.trim();if(lhs=="Z"){String rhs=line.substring(eq+1);rhs.trim();int orPos=rhs.indexOf(" OR ");if(orPos>=0){String a=rhs.substring(0,orPos),b=rhs.substring(orPos+4);if(b.startsWith("Z="))b=b.substring(2);if(!appendCustomCondition(finalExpr,"(z==("+a+"))||((z==("+b+")))"))parseError=true;}else if(!appendCustomCondition(finalExpr,"(z==("+rhs+"))"))parseError=true;}continue;}
-    if(!appendCustomCondition(finalExpr,line))parseError=true;
+    if(eq>0){
+      String lhs=line.substring(0,eq); lhs.trim();
+      bool validName=lhs.length()>0 && ((lhs[0]>='A'&&lhs[0]<='Z')||(lhs[0]>='a'&&lhs[0]<='z')||lhs[0]=='_');
+      for(byte k=1;k<lhs.length()&&validName;k++){char q=lhs[k];if(!((q>='A'&&q<='Z')||(q>='a'&&q<='z')||(q>='0'&&q<='9')||q=='_'))validName=false;}
+      if(!validName){parseError=true;continue;}
+      String rhs=line.substring(eq+1);rhs.trim();
+      if(lhs=="Z") { int orPos=rhs.indexOf(" OR "); if(orPos>=0){while(orPos>=0){String part=rhs.substring(0,orPos);if(!appendCustomZCondition(zExpr,part))parseError=true;rhs=rhs.substring(orPos+4);orPos=rhs.indexOf(" OR ");}if(rhs.length()&&!appendCustomZCondition(zExpr,rhs))parseError=true;} else if(!appendCustomZCondition(zExpr,rhs))parseError=true; haveGeometry=true; }
+      continue;
+    }
+    if(!appendCustomCondition(finalExpr,line))parseError=true; else haveGeometry=true;
   }
-  if(parseError||!haveReturn&&!finalExpr.length())return false;
+  if(parseError||!haveGeometry)return false;
+  if(zExpr.length()){if(finalExpr.length())finalExpr+="&&";finalExpr+="("+zExpr+")";}
   if(finalExpr.indexOf("__CYCLE__")>=0||finalExpr.indexOf("__TOO_LONG__")>=0)return false;
   if(finalExpr.length()>580)return false;
   return compileExpression(finalExpr.c_str());
@@ -240,7 +257,6 @@ void parseCustomFunctionStream(char c){
   }
 }
 
-// Math and Custom always use the exact same Arduino-side frame engine as built-ins.
 void drawExpressionFrame(byte f){
   byte localMatrix[8][8];
   for(byte z=0;z<8;z++){
@@ -331,10 +347,11 @@ void loop(){
     if(parseMode==0){
       if(in=='A'){currentCubeMode=0;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MODE_AUTO"));}
       else if(in=='M'){currentCubeMode=1;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MODE_MANUAL"));}
-      else if(in=='Y'){parseMode=6;rxLength=0;}
+      else if(in=='Y'){parseMode=6;rxLength=0;sendAck(F("MATH_UPLOAD_READY"));}
       else if(in=='F'){if(mathProgramValid){currentCubeMode=3;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();sendAck(F("MATH_STARTED"));}else sendAck(F("MATH_NOT_READY"));}
-      else if(in=='C'){parseMode=5;resetCustomReceive();}
+      else if(in=='C'){parseMode=5;resetCustomReceive();sendAck(F("CUSTOM_UPLOAD_READY"));}
       else if(in=='X'){if(customReady){currentCubeMode=4;animationStart=now;lastFrameTime=now;frameCounter=0;triggerModeBlinkAcknowledgment();sendAck(F("CUSTOM_STARTED"));}else sendAck(F("CUSTOM_NOT_READY"));}
+      else if(in=='S'){if(currentCubeMode==4||customReady){currentCubeMode=0;animationStart=now;lastFrameTime=now;frameCounter=0;sendAck(F("CUSTOM_STOPPED"));}else sendAck(F("CUSTOM_NOT_ACTIVE"));}
       else if(in=='H'){sendAck(F("HANDSHAKE_OK"));}
       else if(in=='N'&&currentCubeMode==1){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);sendAck(F("ANIMATION_NEXT"));}
       else if(in=='B')parseMode=4;
