@@ -85,9 +85,24 @@ void parseCustomFunctionStream(char c){
   if(c=='\n'||c=='\r'){
     if(customRxIdx>0){
       customRxBuf[customRxIdx]='\0'; String line=String(customRxBuf); line.trim(); line.toUpperCase();
-      if(line=="CUSTOM"||line=="CF_BEGIN"){programLength=0;currentCubeMode=4;memset((void*)displayBuffer,0,64);}
-      else if(line=="START CUSTOM"){currentCubeMode=4;memset((void*)displayBuffer,0,64);}
-      else if(line=="END"||line=="CF_END"){parseMode=0;currentCubeMode=0;triggerModeBlinkAcknowledgment();}
+      if(line=="CUSTOM"||line=="CF_BEGIN"){
+        programLength=0;
+        currentCubeMode=4;
+        memset((void*)displayBuffer,0,64);
+      }
+      else if(line=="START CUSTOM"){
+        currentCubeMode=4;
+        memset((void*)displayBuffer,0,64);
+      }
+      else if(line=="END"||line=="CF_END"){
+        // END/CF_END terminates the uploaded definition only.
+        // It must NOT switch to Auto; the uploaded custom program remains active.
+        parseMode=0;
+        currentCubeMode=4;
+        frameCounter=0;
+        animationStart=millis();
+        lastFrameTime=millis();
+      }
       else{
         if(line.indexOf("H=")!=-1||line.indexOf("%16")!=-1)if(programLength<16)compiledProgram[programLength++].op=OP_CALC_H;
         if(line.indexOf("IF")!=-1&&line.indexOf(">=8")!=-1)if(programLength<16)compiledProgram[programLength++].op=OP_CHECK_H_GE_8;
@@ -228,6 +243,7 @@ void loop(){
       else if(in=='N'&&currentCubeMode==1){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);}
       else if(in=='Q'){currentCubeMode=0;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();}
       else if(in=='B'){parseMode=4;}
+      else if(in=='E'){currentCubeMode=0;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();}
     }else if(parseMode==4){if(in>=2&&in<=8)globalBrightness=in;parseMode=0;}
   }
   if(currentCubeMode==0){if(now-animationStart>=AUTO_MODE_CAROUSEL_TIME){animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;}if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);frameCounter=(frameCounter+1)%50;}}
