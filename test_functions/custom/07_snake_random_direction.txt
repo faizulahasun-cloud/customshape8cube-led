@@ -1,15 +1,8 @@
 CUSTOM
-T=F/4
-D=T%4
-H=(F*13+7)%8
-J=(F*5+3)%8
-K=(F*3+1)%8
-A=(D==0)*H+(D!=0)*3.5
-B=(D==1)*H+(D!=1)*3.5
-C=(D==2)*H+(D!=2)*3.5
-DX=X-A
-DY=Y-B
-DZ=Z-C
-Q=DX*DX+DY*DY+DZ*DZ
-IF Q>2.2 OFF
+P=(F*7)%31
+CY=3.5+2.2*sin(P+X*0.9)
+CZ=3.5+2.0*cos(P*0.7+X*0.6)
+DY=Y-CY
+DZ=Z-CZ
+IF DY*DY+DZ*DZ>1.5 OFF
 END
