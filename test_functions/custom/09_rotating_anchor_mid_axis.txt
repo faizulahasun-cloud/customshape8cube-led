@@ -5,6 +5,5 @@ S1=abs(RX)<0.7&&RZ>-2.2&&RZ<1.6
 S2=(abs(RZ-1.6)<0.55&&abs(RX)<2.5)||(RZ<-0.8&&abs(RX)>1.0&&abs(RX)<2.8)
 S=S1||S2
 IF !S OFF
-Y=3
-Y=4
+IF !(Y==3||Y==4) OFF
 END
