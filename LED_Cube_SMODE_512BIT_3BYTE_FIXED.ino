@@ -10,7 +10,7 @@ volatile byte currentCubeMode = 0; // 0 Auto, 1 Manual, 3 Math, 4 Custom
 byte globalBrightness = 4;
 unsigned int animationIndex = 0;
 byte frameCounter = 0;
-const unsigned int TOTAL_ANIMATIONS = 24, FRAME_TIME = 200;
+const unsigned int TOTAL_ANIMATIONS = 27, FRAME_TIME = 200;
 const unsigned long AUTO_MODE_CAROUSEL_TIME = 10000UL;
 unsigned long lastFrameTime = 0, animationStart = 0;
 volatile byte displayBuffer[8][8];
@@ -448,6 +448,84 @@ void startRefreshTimer(){
 inline bool isOuterRing(byte x,byte y){ return x==0||x==7||y==0||y==7; }
 byte perimeterIndex(byte x,byte y){ if(y==0)return x; if(x==7)return 7+y; if(y==7)return 21-x; return 21+(7-y); }
 
+// Built-in animation 24: firecracker / firework. It launches from the
+// lower centre, reaches the top, then expands as an 8-ray burst.
+bool firecrackerVoxel(byte f,byte x,byte y,byte z){
+  if(f<16){
+    byte launchZ=f/2;
+    if((x==3||x==4)&&(y==3||y==4)){
+      if(z==launchZ) return true;
+      if(f>1 && z+1==launchZ) return true;
+    }
+    return false;
+  }
+
+  byte burstF=f-16;
+  byte d=burstF/3;
+  if(d>3) d=3;
+  if(z!=7) return false;
+
+  int vx=(int)x-3;
+  int vy=(int)y-3;
+  if(vx==0 && vy==0) return d==0;
+  if(!(vx==0 || vy==0 || abs(vx)==abs(vy))) return false;
+  return max(abs(vx),abs(vy))==(int)d;
+}
+
+// Deterministic pseudo-random 3D walk. It is reconstructed from the frame,
+// so no RAM path table is needed on the Uno. The body follows the last 8 steps.
+void snakePosition(byte step,byte &sx,byte &sy,byte &sz){
+  int8_t px=3,py=3,pz=3;
+  byte previous=255;
+  byte seed=0x5A;
+
+  for(byte s=0;s<step;s++){
+    seed=(byte)(seed*109u+89u);
+    byte first=(byte)((seed+s*13u)%6u);
+    bool moved=false;
+    for(byte tries=0;tries<6;tries++){
+      byte d=(first+tries)%6;
+      if(previous!=255 && d==(previous^1)) continue;
+      int8_t nx=px,ny=py,nz=pz;
+      if(d==0) nx++;
+      else if(d==1) nx--;
+      else if(d==2) ny++;
+      else if(d==3) ny--;
+      else if(d==4) nz++;
+      else nz--;
+      if(nx<0||nx>7||ny<0||ny>7||nz<0||nz>7) continue;
+      px=nx; py=ny; pz=nz; previous=d; moved=true; break;
+    }
+    if(!moved) break;
+  }
+
+  sx=(byte)px; sy=(byte)py; sz=(byte)pz;
+}
+
+bool snakeVoxel(byte f,byte x,byte y,byte z){
+  byte length=(f<7)?(f+1):8;
+  for(byte k=0;k<length;k++){
+    byte sx,sy,sz;
+    snakePosition((byte)(f-k),sx,sy,sz);
+    if(x==sx && y==sy && z==sz) return true;
+  }
+  return false;
+}
+
+// 8x8 heart mask. It is two layers thick and rotates around the central Z axis.
+const byte HEART_MASK[8]={0x66,0xFF,0xFF,0x7E,0x3C,0x18,0x18,0x00};
+
+bool rotatingHeartVoxel(byte f,byte x,byte y,byte z){
+  if(z!=3 && z!=4) return false;
+  byte r=(f/4)%4;
+  byte u,v;
+  if(r==0){ u=x; v=y; }
+  else if(r==1){ u=y; v=7-x; }
+  else if(r==2){ u=7-x; v=7-y; }
+  else { u=7-y; v=x; }
+  return (HEART_MASK[v] & (1<<u))!=0;
+}
+
 bool animationVoxel(byte a,byte f,byte x,byte y,byte z){
   if(a==0) return z==(f%8);
   if(a==1) return z==(7-(f%8));
@@ -473,6 +551,9 @@ bool animationVoxel(byte a,byte f,byte x,byte y,byte z){
   if(a==21){ int d=abs((int)x-3)+abs((int)y-3)+abs((int)z-3); return ((d+f)%4)<2; }
   if(a==22) return ((x+y+z+f)%8)==0;
   if(a==23){ if(!((x==0||x==7)&&(y==0||y==7)&&(z==0||z==7)))return false; byte c=((z==7)?4:0)+((y==7)?2:0)+((x==7)?1:0); return c==(f%8); }
+  if(a==24) return firecrackerVoxel(f,x,y,z);
+  if(a==25) return snakeVoxel(f,x,y,z);
+  if(a==26) return rotatingHeartVoxel(f,x,y,z);
   return false;
 }
 
