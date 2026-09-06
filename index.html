@@ -1,387 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>8x8x8 LED Cube Console - Hybrid Studio</title>
-    <style>
-        :root{--bg-color:#0b0f19;--panel-bg:#151f32;--text-color:#f1f5f9;--text-muted:#94a3b8;--primary:#2563eb;--primary-hover:#1d4ed8;--success:#10b981;--success-hover:#059669;--warning:#f59e0b;--warning-hover:#d97706;--danger:#ef4444;--danger-hover:#dc2626;--border:#334155}
-        *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-        body{background:var(--bg-color);color:var(--text-color);padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh}
-        .console-container{background:var(--panel-bg);border:1px solid var(--border);border-radius:12px;width:100%;max-width:650px;padding:24px;box-shadow:0 10px 25px -5px rgba(0,0,0,.3)}
-        h2{font-size:1.5rem;letter-spacing:1px;text-align:center;margin-bottom:20px;color:#fff;border-bottom:2px solid var(--border);padding-bottom:12px}
-        h3{font-size:1rem;color:var(--text-muted);margin-top:24px;margin-bottom:12px;letter-spacing:.5px}
-        .status-panel{background:rgba(0,0,0,.2);border:1px solid var(--border);padding:12px;border-radius:6px;font-family:monospace;font-size:.9rem;text-align:center;margin-bottom:20px;color:var(--warning)}
-        .status-disconnected{color:var(--danger)}
-        .status-connected{color:var(--success)}
-        .btn{display:block;width:100%;padding:12px;margin-bottom:12px;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;transition:background-color .2s,opacity .2s;text-align:center;text-transform:uppercase}
-        .btn:disabled{opacity:.4;cursor:not-allowed}
-        .btn-primary{background:var(--primary);color:#fff}
-        .btn-primary:hover:not(:disabled){background:var(--primary-hover)}
-        .btn-success{background:var(--success);color:#fff}
-        .btn-success:hover:not(:disabled){background:var(--success-hover)}
-        .btn-warning{background:var(--warning);color:#fff}
-        .btn-warning:hover:not(:disabled){background:var(--warning-hover)}
-        .btn-danger{background:var(--danger);color:#fff}
-        .btn-danger:hover:not(:disabled){background:var(--danger-hover)}
-        .control-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        .engine-panel{border-top:1px dashed var(--border);margin-top:20px;padding-top:10px}
-        textarea{width:100%;height:120px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;color:#51ff00;font-family:monospace;padding:10px;resize:vertical;margin-bottom:12px;font-size:.85rem}
-        .preview-box{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:12px;text-align:center}
-        .preview-label{font-size:.8rem;color:var(--text-muted);margin-bottom:6px;display:flex;justify-content:space-between}
-        .range-container{margin-top:16px;background:rgba(0,0,0,.1);padding:12px;border-radius:6px;border:1px solid var(--border)}
-        .range-label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--text-muted);margin-bottom:6px}
-        input[type=range]{width:100%;accent-color:var(--primary)}
-    </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>8x8x8 LED Cube Console - Hybrid Studio</title>
+<style>
+:root{--bg-color:#0b0f19;--panel-bg:#151f32;--text-color:#f1f5f9;--text-muted:#94a3b8;--primary:#2563eb;--primary-hover:#1d4ed8;--success:#10b981;--success-hover:#059669;--warning:#f59e0b;--warning-hover:#d97706;--danger:#ef4444;--danger-hover:#dc2626;--border:#334155}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{background:var(--bg-color);color:var(--text-color);padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.console-container{background:var(--panel-bg);border:1px solid var(--border);border-radius:12px;width:100%;max-width:650px;padding:24px;box-shadow:0 10px 25px -5px rgba(0,0,0,.3)}
+h2{font-size:1.5rem;letter-spacing:1px;text-align:center;margin-bottom:20px;color:#fff;border-bottom:2px solid var(--border);padding-bottom:12px}
+h3{font-size:1rem;color:var(--text-muted);margin-top:24px;margin-bottom:12px;letter-spacing:.5px}
+.status-panel{background:rgba(0,0,0,.2);border:1px solid var(--border);padding:12px;border-radius:6px;font-family:monospace;font-size:.9rem;text-align:center;margin-bottom:20px;color:var(--warning)}
+.status-disconnected{color:var(--danger)}.status-connected{color:var(--success)}
+.btn{display:block;width:100%;padding:12px;margin-bottom:12px;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;transition:background-color .2s,opacity .2s;text-align:center;text-transform:uppercase}
+.btn:disabled{opacity:.4;cursor:not-allowed}.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover:not(:disabled){background:var(--primary-hover)}.btn-success{background:var(--success);color:#fff}.btn-success:hover:not(:disabled){background:var(--success-hover)}.btn-warning{background:var(--warning);color:#fff}.btn-warning:hover:not(:disabled){background:var(--warning-hover)}.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover:not(:disabled){background:var(--danger-hover)}
+.control-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}.engine-panel{border-top:1px dashed var(--border);margin-top:20px;padding-top:10px}
+textarea{width:100%;height:120px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;color:#51ff00;font-family:monospace;padding:10px;resize:vertical;margin-bottom:12px;font-size:.85rem}
+.preview-box{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:12px;text-align:center}.preview-label{font-size:.8rem;color:var(--text-muted);margin-bottom:6px;display:flex;justify-content:space-between}
+.range-container{margin-top:16px;background:rgba(0,0,0,.1);padding:12px;border-radius:6px;border:1px solid var(--border)}.range-label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--text-muted);margin-bottom:6px}input[type=range]{width:100%;accent-color:var(--primary)}
+</style>
 </head>
 <body>
-
 <div class="console-container">
-    <h2>8x8x8 LED CUBE CONSOLE</h2>
-    <div class="status-panel" id="connectionLog">INTERFACE STATUS: DISCONNECTED</div>
-    
-    <button id="connectBtn" class="btn btn-primary" onclick="triggerBLELinkSession()">Pair HM-10 BLE Module</button>
-    <button id="disconnectBtn" class="btn btn-danger" onclick="terminateConnectionSequence()" style="display:none; margin-bottom:12px;">Disconnect Session</button>
-
-    <div class="control-group">
-        <button class="btn btn-success" onclick="transmitModeToken('A')">Auto Mode ('A')</button>
-        <button class="btn btn-warning" onclick="transmitModeToken('M')">Manual Mode ('M')</button>
-    </div>
-    <div class="control-group">
-        <button class="btn btn-primary" style="background:#ffd600; color:#121212;" onclick="transmitModeToken('N')">Next Step ('N')</button>
-        <button class="btn btn-warning" style="background:#06b6d4; color:#fff;" onclick="transmitModeToken('F')">Math Mode ('F')</button>
-    </div>
-
-    <div class="engine-panel">
-        <h3>MATHEMATICAL FUNCTION ENGINE f(x,y,z,t)</h3>
-        <textarea id="mathIDE" placeholder="z <= 3.5 + 2.5 * sin(sqrt((x-3.5)*(x-3.5) + (y-3.5)*(y-3.5)) * 0.8 - t * 0.2)" oninput="compileMathFunction()"></textarea>
-        
-        <div class="preview-box">
-            <div class="preview-label">
-                <span>LIVE FRAME PREVIEW (Frame 0):</span>
-                <span id="frameCountLabel">0 Frames Compiled</span>
-            </div>
-            <canvas id="layerPreviewCanvas" width="160" height="160" style="background:#000;border-radius:4px;width:120px;height:120px;image-rendering:pixelated;"></canvas>
-        </div>
-
-        <div class="control-group">
-            <button class="btn btn-primary" style="background:#475569; grid-column: span 2;" onclick="compileMathFunction()">Compile Math Preview</button>
-        </div>
-    </div>
-
-    <div class="engine-panel">
-        <h3>CUSTOM FUNCTION ENGINE f(x,y,z,f)</h3>
-        <textarea id="customFuncIDE" placeholder="CUSTOM&#10;H=(X*3+Y*5+F)%16&#10;IF H>=8 OFF&#10;RZ=7-H&#10;Z=RZ OR Z=RZ+1&#10;END"></textarea>
-        <div class="control-group">
-            <button class="btn btn-primary" style="background:#475569" onclick="sendCustomFunction()">Send Function</button>
-            <button class="btn btn-success" id="runCustomBtn" onclick="startCustomFunction()" disabled>Start Custom</button>
-        </div>
-        <button class="btn btn-danger" id="stopCustomBtn" onclick="stopCustomFunction()" disabled>Stop Custom</button>
-    </div>
-
-    <div class="range-container">
-        <div class="range-label">
-            <span>BRIGHTNESS CONTROL:</span>
-            <span id="sliderValLabel">5</span>
-        </div>
-        <input type="range" id="brightnessInputSlider" min="2" max="8" value="5" step="1" oninput="executeBrightnessShift(this.value)">
-    </div>
+<h2>8x8x8 LED CUBE CONSOLE</h2>
+<div class="status-panel" id="connectionLog">INTERFACE STATUS: DISCONNECTED</div>
+<button id="connectBtn" class="btn btn-primary" onclick="triggerBLELinkSession()">Pair HM-10 BLE Module</button>
+<button id="disconnectBtn" class="btn btn-danger" onclick="terminateConnectionSequence()" style="display:none;margin-bottom:12px;">Disconnect Session</button>
+<div class="control-group"><button class="btn btn-success" onclick="transmitModeToken('A')">Auto Mode ('A')</button><button class="btn btn-warning" onclick="transmitModeToken('M')">Manual Mode ('M')</button></div>
+<div class="control-group"><button class="btn btn-primary" style="background:#ffd600;color:#121212;" onclick="transmitModeToken('N')">Next Step ('N')</button><button class="btn btn-warning" style="background:#06b6d4;color:#fff;" onclick="transmitModeToken('F')">Math Mode ('F')</button></div>
+<div class="engine-panel">
+<h3>MATHEMATICAL FUNCTION ENGINE f(x,y,z,t)</h3>
+<textarea id="mathIDE" placeholder="z <= 3.5 + 2.5 * sin(sqrt((x-3.5)*(x-3.5) + (y-3.5)*(y-3.5)) * 0.8 - t * 0.2)" oninput="compileMathFunction()"></textarea>
+<div class="preview-box"><div class="preview-label"><span>LIVE FRAME PREVIEW (Frame 0):</span><span id="frameCountLabel">0 Frames Compiled</span></div><canvas id="layerPreviewCanvas" width="160" height="160" style="background:#000;border-radius:4px;width:120px;height:120px;image-rendering:pixelated;"></canvas></div>
+<div class="control-group"><button class="btn btn-primary" style="background:#475569;grid-column:span 2;" onclick="compileMathFunction()">Compile Math Preview</button></div>
 </div>
-
+<div class="engine-panel">
+<h3>CUSTOM FUNCTION ENGINE f(x,y,z,f)</h3>
+<textarea id="customFuncIDE" placeholder="CUSTOM&#10;H=(X*3+Y*5+F)%16&#10;IF H>=8 OFF&#10;RZ=7-H&#10;Z=RZ OR Z=RZ+1&#10;END"></textarea>
+<div class="control-group"><button class="btn btn-primary" style="background:#475569" onclick="sendCustomFunction()">Send Function</button><button class="btn btn-success" id="runCustomBtn" onclick="startCustomFunction()" disabled>Start Custom</button></div>
+<button class="btn btn-danger" id="stopCustomBtn" onclick="stopCustomFunction()" disabled>Stop Custom</button>
+</div>
+<div class="range-container"><div class="range-label"><span>BRIGHTNESS CONTROL:</span><span id="sliderValLabel">5</span></div><input type="range" id="brightnessInputSlider" min="2" max="8" value="5" step="1" oninput="executeBrightnessShift(this.value)"></div>
+</div>
 <script>
-    let physicalTargetDevice = null, targetDataCharacteristic = null;
-    const HM10_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
-    const HM10_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
-    
-    let mathFrames = [];
-    let bleWriteQueue = Promise.resolve();
-    let webCubeMode = "NONE";
-    let webAnimationTimerLoop = null;
-    let webRenderFrameTrack = null;
-     
-    window.addEventListener("DOMContentLoaded", () => {
-        const cachedMath = localStorage.getItem("cube_cached_math_expr");
-        if(cachedMath) document.getElementById("mathIDE").value = cachedMath;
-        else document.getElementById("mathIDE").value = "z <= 3.5 + 2.5 * sin(sqrt((x-3.5)*(x-3.5) + (y-3.5)*(y-3.5)) * 0.8 - t * 0.2)";
-        const cachedCustom = localStorage.getItem("cube_cached_custom_func");
-        if(cachedCustom) document.getElementById("customFuncIDE").value = cachedCustom;
-        else document.getElementById("customFuncIDE").value = "CUSTOM\nH=(X*3+Y*5+F)%16\nIF H>=8 OFF\nRZ=7-H\nZ=RZ OR Z=RZ+1\nEND";
-        compileMathFunction();
-    });
-
-    function drawPreview(frameBytes){
-        const canvas = document.getElementById("layerPreviewCanvas");
-        if(!canvas) return;
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const cellW = canvas.width / 8;
-        const cellH = canvas.height / 8;
-
-        for(let y = 0; y < 8; y++){
-            for(let x = 0; x < 8; x++){
-                const index = 0 * 64 + y * 8 + x;
-                const byteIndex = index >> 3;
-                const bitIndex = index & 7;
-                const isOn = (frameBytes[byteIndex] & (1 << bitIndex)) !== 0;
-
-                if(isOn){
-                    ctx.fillStyle = "#51ff00";
-                    ctx.fillRect(x * cellW + 1, y * cellH + 1, cellW - 2, cellH - 2);
-                }
-            }
-        }
-    }
-
-    function compileMathFunction(){
-        mathFrames = [];
-        const exprElem = document.getElementById("mathIDE");
-        if(!exprElem) return 0;
-        const exprStr = exprElem.value.trim();
-        localStorage.setItem("cube_cached_math_expr", exprStr);
-
-        // Generate 50 frames for the animation loop preview
-        const totalFrames = 50;
-        for(let f = 0; f < totalFrames; f++){
-            let frameBytes = new Uint8Array(64);
-            let t = f;
-            for(let z = 0; z < 8; z++){
-                for(let y = 0; y < 8; y++){
-                    for(let x = 0; x < 8; x++){
-                        let matched = false;
-                        try {
-                            // Evaluate mathematical condition safely
-                            matched = eval(exprStr);
-                        } catch(e) {
-                            matched = false;
-                        }
-                        if(matched){
-                            const index = z * 64 + y * 8 + x;
-                            const byteIndex = index >> 3;
-                            const bitIndex = index & 7;
-                            frameBytes[byteIndex] |= (1 << bitIndex);
-                        }
-                    }
-                }
-            }
-            mathFrames.push({bytes: frameBytes, delay: 100});
-        }
-        const count = mathFrames.length;
-        const frameCountLabel = document.getElementById("frameCountLabel");
-        if(frameCountLabel) frameCountLabel.innerText = count + " Frame(s) Compiled";
-        if(mathFrames.length > 0) drawPreview(mathFrames[0].bytes);
-        return mathFrames.length;
-    }
-
-    async function triggerBLELinkSession(){
-        const log = document.getElementById("connectionLog");
-        log.innerText = "SEARCHING...";
-        log.style.color = "var(--warning)";
-
-        try{
-            physicalTargetDevice = await navigator.bluetooth.requestDevice({
-                filters: [{services: [HM10_SERVICE_UUID]}],
-                optionalServices: [HM10_SERVICE_UUID]
-            });
-
-            log.innerText = "CONNECTING TO GATT LAYER...";
-            const server = await physicalTargetDevice.gatt.connect();
-            const service = await server.getPrimaryService(HM10_SERVICE_UUID);
-            targetDataCharacteristic = await service.getCharacteristic(HM10_CHAR_UUID);
-            await targetDataCharacteristic.startNotifications();
-            targetDataCharacteristic.addEventListener('characteristicvaluechanged', onDataNotificationsReceived);
-            triggerHardwareHandshake(targetDataCharacteristic);
-
-            log.innerText = "INTERFACE STATUS: CONNECTED";
-            log.className = "status-panel status-connected";
-            document.getElementById('connectBtn').style.display = "none";
-            document.getElementById('disconnectBtn').style.display = "block";
-
-            webCubeMode = "NONE";
-
-            physicalTargetDevice.addEventListener("gattserverdisconnected", cleanSessionStateWipe);
-        }catch(e){
-            console.error(e);
-            targetDataCharacteristic = null;
-            webCubeMode = "NONE";
-            log.innerText = "CONNECTION FAILED";
-            log.className = "status-panel status-disconnected";
-            alert("Connection Failed: " + e.message);
-        }
-    }
-
-    function triggerHardwareHandshake(txChar) {
-      const encoder = new TextEncoder();
-      txChar.writeValue(encoder.encode("H"));
-    }
-
-    function onDataNotificationsReceived(event) {
-      const value = event.target.value;
-      const decoder = new TextDecoder('utf-8');
-      const cleanData = decoder.decode(value).trim();
-      
-      if (cleanData === "CONNECTED") {
-        const headings = Array.from(document.querySelectorAll('h2, h3, div, span, p'));
-        const statusTarget = headings.find(el => el.textContent.includes("INTERFACE STATUS:"));
-        if (statusTarget) {
-          statusTarget.textContent = "INTERFACE STATUS: CONNECTED";
-          statusTarget.style.color = "#00FF00"; // Dynamic active green feedback
-        }
-      }
-    }
-
-    function cleanSessionStateWipe(){
-        targetDataCharacteristic = null;
-        physicalTargetDevice = null;
-        webCubeMode = "NONE";
-        const log = document.getElementById('connectionLog');
-        log.innerText = "DISCONNECTED";
-        log.className = "status-panel status-disconnected";
-        document.getElementById('connectBtn').style.display = "block";
-        document.getElementById('disconnectBtn').style.display = "none";
-    }
-
-    async function terminateConnectionSequence(){
-        targetDataCharacteristic = null;
-        webCubeMode = "NONE";
-        if(physicalTargetDevice && physicalTargetDevice.gatt.connected){
-            try {
-                await transmitModeToken('Q');
-            } catch(e) {}
-            physicalTargetDevice.gatt.disconnect();
-        }
-        cleanSessionStateWipe();
-    }
-
-    function queueBLEWrite(data){
-        bleWriteQueue = bleWriteQueue.catch(() => {}).then(async() => {
-            if(!targetDataCharacteristic) throw new Error("Bluetooth disconnected.");
-
-            let attempts = 0;
-            while(attempts < 5){
-                try{
-                    await targetDataCharacteristic.writeValueWithoutResponse(data);
-                    return;
-                }catch(e){
-                    attempts++;
-                    const msg = e && e.message ? e.message : "";
-                    if(!msg.toLowerCase().includes("already in progress")) throw e;
-                    await new Promise(r => setTimeout(r, 100));
-                }
-            }
-            throw new Error("BLE GATT remained busy after multiple retries.");
-        });
-        return bleWriteQueue;
-    }
-
-    async function executeBrightnessShift(val){
-        document.getElementById("sliderValLabel").innerText = val;
-        try{
-            await queueBLEWrite(new Uint8Array([0x42, parseInt(val, 10)]));
-        }catch(e){
-            console.error("Brightness transmission:", e);
-        }
-    }
-
-    async function transmitModeToken(c){
-        if(!targetDataCharacteristic) return;
-        if(c === "N" && webCubeMode !== "M") return;
-
-        if(c === "A") webCubeMode = "A";
-        else if(c === "M") webCubeMode = "M";
-        else if(c === "F") {
-            webCubeMode = "F";
-            try {
-                clearInterval(webAnimationTimerLoop);
-                cancelAnimationFrame(webRenderFrameTrack);
-            } catch(e) {}
-        }
-        else if(c === "Q") webCubeMode = "A";
-
-        try{
-            const encoder = new TextEncoder();
-            await queueBLEWrite(encoder.encode(c));
-        }catch(e){
-            console.error("Mode command:", e);
-        }
-    }
-
-    async function sendCustomFunction(){
-        if(!targetDataCharacteristic){
-            alert("Please connect to Bluetooth HM-10 first!");
-            return;
-        }
-        const code = document.getElementById("customFuncIDE").value;
-        localStorage.setItem("cube_cached_custom_func", code);
-
-        const log = document.getElementById("connectionLog");
-        log.innerText = "SENDING CUSTOM FUNCTION...";
-        log.style.color = "var(--warning)";
-
-        try{
-            const encoder = new TextEncoder();
-            await queueBLEWrite(encoder.encode("C"));
-            await new Promise(r => setTimeout(r, 50));
-
-            const fullText = code.trim() + "\nEND\n";
-            for(let i = 0; i < fullText.length; i += 20){
-                const chunk = fullText.slice(i, i + 20);
-                await queueBLEWrite(encoder.encode(chunk));
-                await new Promise(r => setTimeout(r, 20));
-            }
-
-            log.innerText = "CUSTOM FUNCTION SENT & COMPILED";
-            log.style.color = "var(--success)";
-            document.getElementById("runCustomBtn").disabled = false;
-        }catch(e){
-            log.innerText = "FUNCTION SEND FAILED";
-            log.style.color = "var(--danger)";
-            alert("Failed to send custom function: " + e.message);
-        }
-    }
-
-    async function startCustomFunction(){
-        if(!targetDataCharacteristic){
-            alert("Please connect to Bluetooth HM-10 first!");
-            return;
-        }
-        try{
-            try {
-                clearInterval(webAnimationTimerLoop);
-                cancelAnimationFrame(webRenderFrameTrack);
-            } catch(e) {}
-
-            const encoder = new TextEncoder();
-            await queueBLEWrite(encoder.encode("C"));
-            await new Promise(r => setTimeout(r, 50));
-            await queueBLEWrite(encoder.encode("START CUSTOM\n"));
-            webCubeMode = "CUSTOM";
-            document.getElementById("stopCustomBtn").disabled = false;
-            const log = document.getElementById("connectionLog");
-            log.innerText = "RUNNING CUSTOM FUNCTION ENGINE";
-            log.style.color = "var(--success)";
-        }catch(e){
-            alert("Failed to start custom function: " + e.message);
-        }
-    }
-
-    async function stopCustomFunction(){
-        if(!targetDataCharacteristic) return;
-        try{
-            const encoder = new TextEncoder();
-            await queueBLEWrite(encoder.encode("END\n"));
-            await new Promise(r => setTimeout(r, 50));
-            await transmitModeToken('A');
-            webCubeMode = "A";
-            document.getElementById("stopCustomBtn").disabled = true;
-            const log = document.getElementById("connectionLog");
-            log.innerText = "INTERFACE STATUS: CONNECTED";
-            log.style.color = "var(--success)";
-        }catch(e){
-            alert("Failed to stop custom function: " + e.message);
-        }
-    }
+let physicalTargetDevice=null,targetDataCharacteristic=null;
+const HM10_SERVICE_UUID="0000ffe0-0000-1000-8000-00805f9b34fb",HM10_CHAR_UUID="0000ffe1-0000-1000-8000-00805f9b34fb";
+let mathFrames=[],bleWriteQueue=Promise.resolve(),webCubeMode="NONE",webAnimationTimerLoop=null,webRenderFrameTrack=null;
+window.addEventListener("DOMContentLoaded",()=>{const cachedMath=localStorage.getItem("cube_cached_math_expr");if(cachedMath)document.getElementById("mathIDE").value=cachedMath;else document.getElementById("mathIDE").value="z <= 3.5 + 2.5 * sin(sqrt((x-3.5)*(x-3.5) + (y-3.5)*(y-3.5)) * 0.8 - t * 0.2)";const cachedCustom=localStorage.getItem("cube_cached_custom_func");if(cachedCustom)document.getElementById("customFuncIDE").value=cachedCustom;else document.getElementById("customFuncIDE").value="CUSTOM\nH=(X*3+Y*5+F)%16\nIF H>=8 OFF\nRZ=7-H\nZ=RZ OR Z=RZ+1\nEND";compileMathFunction();});
+function drawPreview(frameBytes){const canvas=document.getElementById("layerPreviewCanvas");if(!canvas)return;const ctx=canvas.getContext("2d");ctx.fillStyle="#000";ctx.fillRect(0,0,canvas.width,canvas.height);const cellW=canvas.width/8,cellH=canvas.height/8;for(let y=0;y<8;y++)for(let x=0;x<8;x++){const index=y*8+x,byteIndex=index>>3,bitIndex=index&7;if((frameBytes[byteIndex]&(1<<bitIndex))!==0){ctx.fillStyle="#51ff00";ctx.fillRect(x*cellW+1,y*cellH+1,cellW-2,cellH-2);}}}
+function compileMathFunction(){mathFrames=[];const exprElem=document.getElementById("mathIDE");if(!exprElem)return 0;const exprStr=exprElem.value.trim();localStorage.setItem("cube_cached_math_expr",exprStr);for(let f=0;f<50;f++){let frameBytes=new Uint8Array(64),t=f;for(let z=0;z<8;z++)for(let y=0;y<8;y++)for(let x=0;x<8;x++){let matched=false;try{matched=eval(exprStr);}catch(e){matched=false}if(matched){const index=z*64+y*8+x;frameBytes[index>>3]|=1<<(index&7);}}mathFrames.push({bytes:frameBytes,delay:100});}const count=mathFrames.length,frameCountLabel=document.getElementById("frameCountLabel");if(frameCountLabel)frameCountLabel.innerText=count+" Frame(s) Compiled";if(mathFrames.length)drawPreview(mathFrames[0].bytes);return count;}
+async function triggerBLELinkSession(){const log=document.getElementById("connectionLog");log.innerText="SEARCHING...";log.style.color="var(--warning)";try{physicalTargetDevice=await navigator.bluetooth.requestDevice({filters:[{services:[HM10_SERVICE_UUID]}],optionalServices:[HM10_SERVICE_UUID]});log.innerText="CONNECTING TO GATT LAYER...";const server=await physicalTargetDevice.gatt.connect(),service=await server.getPrimaryService(HM10_SERVICE_UUID);targetDataCharacteristic=await service.getCharacteristic(HM10_CHAR_UUID);await targetDataCharacteristic.startNotifications();targetDataCharacteristic.addEventListener('characteristicvaluechanged',onDataNotificationsReceived);triggerHardwareHandshake(targetDataCharacteristic);log.innerText="INTERFACE STATUS: CONNECTED";log.className="status-panel status-connected";document.getElementById('connectBtn').style.display="none";document.getElementById('disconnectBtn').style.display="block";webCubeMode="NONE";physicalTargetDevice.addEventListener("gattserverdisconnected",cleanSessionStateWipe);}catch(e){console.error(e);targetDataCharacteristic=null;webCubeMode="NONE";log.innerText="CONNECTION FAILED";log.className="status-panel status-disconnected";alert("Connection Failed: "+e.message);}}
+function triggerHardwareHandshake(txChar){txChar.writeValue(new TextEncoder().encode("H"));}
+function onDataNotificationsReceived(event){const cleanData=new TextDecoder('utf-8').decode(event.target.value).trim();if(cleanData==="CONNECTED"){const headings=Array.from(document.querySelectorAll('h2,h3,div,span,p'));const statusTarget=headings.find(el=>el.textContent.includes("INTERFACE STATUS:"));if(statusTarget){statusTarget.textContent="INTERFACE STATUS: CONNECTED";statusTarget.style.color="#00FF00";}}}
+function cleanSessionStateWipe(){targetDataCharacteristic=null;physicalTargetDevice=null;webCubeMode="NONE";const log=document.getElementById('connectionLog');log.innerText="DISCONNECTED";log.className="status-panel status-disconnected";document.getElementById('connectBtn').style.display="block";document.getElementById('disconnectBtn').style.display="none";}
+async function terminateConnectionSequence(){if(physicalTargetDevice&&physicalTargetDevice.gatt.connected){try{await transmitModeToken('Q');}catch(e){}physicalTargetDevice.gatt.disconnect();}cleanSessionStateWipe();}
+function queueBLEWrite(data){bleWriteQueue=bleWriteQueue.catch(()=>{}).then(async()=>{if(!targetDataCharacteristic)throw new Error("Bluetooth disconnected.");let attempts=0;while(attempts<5){try{await targetDataCharacteristic.writeValueWithoutResponse(data);return;}catch(e){attempts++;const msg=e&&e.message?e.message:"";if(!msg.toLowerCase().includes("already in progress"))throw e;await new Promise(r=>setTimeout(r,100));}}throw new Error("BLE GATT remained busy after multiple retries.");});return bleWriteQueue;}
+async function executeBrightnessShift(val){document.getElementById("sliderValLabel").innerText=val;try{await queueBLEWrite(new Uint8Array([0x42,parseInt(val,10)]));}catch(e){console.error("Brightness transmission:",e);}}
+async function sendMathFunction(){if(!targetDataCharacteristic)throw new Error("Bluetooth disconnected.");const expr=document.getElementById("mathIDE").value.trim();if(!expr)throw new Error("Math expression is empty.");const encoder=new TextEncoder();await queueBLEWrite(encoder.encode("Y"));await new Promise(r=>setTimeout(r,30));const payload=expr+"\n";for(let i=0;i<payload.length;i+=20){await queueBLEWrite(encoder.encode(payload.slice(i,i+20)));await new Promise(r=>setTimeout(r,15));}}
+async function transmitModeToken(c){if(!targetDataCharacteristic)return;if(c==="N"&&webCubeMode!=="M")return;if(c==="A")webCubeMode="A";else if(c==="M")webCubeMode="M";else if(c==="F"){webCubeMode="F";try{clearInterval(webAnimationTimerLoop);cancelAnimationFrame(webRenderFrameTrack);}catch(e){}try{await sendMathFunction();}catch(e){console.error("Math function transmission:",e);alert("Failed to transmit math function: "+e.message);return;}}else if(c==="Q")webCubeMode="A";try{await queueBLEWrite(new TextEncoder().encode(c));}catch(e){console.error("Mode command:",e);}}
+async function sendCustomFunction(){if(!targetDataCharacteristic){alert("Please connect to Bluetooth HM-10 first!");return;}const code=document.getElementById("customFuncIDE").value;localStorage.setItem("cube_cached_custom_func",code);const log=document.getElementById("connectionLog");log.innerText="SENDING CUSTOM FUNCTION...";log.style.color="var(--warning)";try{const encoder=new TextEncoder();await queueBLEWrite(encoder.encode("C"));await new Promise(r=>setTimeout(r,50));const fullText=code.trim()+"\nEND\n";for(let i=0;i<fullText.length;i+=20){await queueBLEWrite(encoder.encode(fullText.slice(i,i+20)));await new Promise(r=>setTimeout(r,20));}log.innerText="CUSTOM FUNCTION SENT & COMPILED";log.style.color="var(--success)";document.getElementById("runCustomBtn").disabled=false;}catch(e){log.innerText="FUNCTION SEND FAILED";log.style.color="var(--danger)";alert("Failed to send custom function: "+e.message);}}
+async function startCustomFunction(){if(!targetDataCharacteristic){alert("Please connect to Bluetooth HM-10 first!");return;}try{clearInterval(webAnimationTimerLoop);cancelAnimationFrame(webRenderFrameTrack);const encoder=new TextEncoder();await queueBLEWrite(encoder.encode("C"));await new Promise(r=>setTimeout(r,50));await queueBLEWrite(encoder.encode("START CUSTOM\n"));webCubeMode="CUSTOM";document.getElementById("stopCustomBtn").disabled=false;const log=document.getElementById("connectionLog");log.innerText="RUNNING CUSTOM FUNCTION ENGINE";log.style.color="var(--success)";}catch(e){alert("Failed to start custom function: "+e.message);}}
+async function stopCustomFunction(){if(!targetDataCharacteristic)return;try{const encoder=new TextEncoder();await queueBLEWrite(encoder.encode("END\n"));await new Promise(r=>setTimeout(r,50));await transmitModeToken('A');webCubeMode="A";document.getElementById("stopCustomBtn").disabled=true;const log=document.getElementById("connectionLog");log.innerText="INTERFACE STATUS: CONNECTED";log.style.color="var(--success)";}catch(e){alert("Failed to stop custom function: "+e.message);}}
 </script>
 </body>
 </html>
