@@ -132,13 +132,16 @@ void parseCustomFunctionStream(char c) {
       line.trim();
       line.toUpperCase();
       
-      if(line == "CUSTOM" || line == "CF_BEGIN" || line == "START CUSTOM") {
+      if(line == "CUSTOM" || line == "CF_BEGIN") {
         programLength = 0;
-        currentCubeMode = 4; // Explicitly lock hardware rendering array into Custom Engine execution mode
+        currentCubeMode = 4;
+        memset((void*)displayBuffer, 0, 64);
+      } else if(line == "START CUSTOM") {
+        currentCubeMode = 4;
         memset((void*)displayBuffer, 0, 64);
       } else if(line == "END" || line == "CF_END") {
         parseMode = 0;
-        currentCubeMode = 0; // Seamlessly fall back to Auto Carousel Mode upon stream termination
+        currentCubeMode = 0;
         triggerModeBlinkAcknowledgment();
       } else {
         if(line.indexOf("H=") != -1 || line.indexOf("%16") != -1) {
@@ -281,12 +284,14 @@ void drawAnimationFrame(byte a, byte f){
 void handleScriptControl(byte cmd){
   if(cmd == 0x41 || cmd == 0x51 || cmd == 'A' || cmd == 'Q'){ 
     currentCubeMode = 0;
+
     parseMode = 0;
     animationStart = millis();
     lastFrameTime = animationStart;
     triggerModeBlinkAcknowledgment();
   } else if(cmd == 0x4D || cmd == 'M'){ 
     currentCubeMode = 1;
+
     parseMode = 0;
     animationStart = millis();
     lastFrameTime = animationStart;
@@ -391,7 +396,7 @@ void loop(){
       else if(in == 'M' || in == 0x4D){ currentCubeMode = 1; animationStart = now; lastFrameTime = now; triggerModeBlinkAcknowledgment(); }
       else if(in == 'F' || in == 0x46){ currentCubeMode = 3; memset((void*)displayBuffer, 0, 64); animationStart = now; lastFrameTime = now; triggerModeBlinkAcknowledgment(); }
       else if(in == 'X' || in == 0x58){ currentCubeMode = 4; memset((void*)displayBuffer, 0, 64); animationStart = now; lastFrameTime = now; triggerModeBlinkAcknowledgment(); }
-      else if(in == 'C'){ parseMode = 5; customRxIdx = 0; programLength = 0; }
+      else if(in == 'C'){ parseMode = 5; customRxIdx = 0; }
       else if(in == 'H'){ bluetooth.println("CONNECTED"); triggerModeBlinkAcknowledgment(); }
       else if(in == 'N' && currentCubeMode == 1){ animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS; frameCounter = 0; lastFrameTime = now; drawAnimationFrame(animationIndex, frameCounter); }
       else if(in == 'Q'){ currentCubeMode = 0; animationStart = now; lastFrameTime = now; triggerModeBlinkAcknowledgment(); }
