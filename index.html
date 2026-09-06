@@ -24,15 +24,9 @@
         .btn-warning:hover:not(:disabled){background:var(--warning-hover)}
         .btn-danger{background:var(--danger);color:#fff}
         .btn-danger:hover:not(:disabled){background:var(--danger-hover)}
-        .btn-s-mode{background:#8b5cf6;color:#fff;margin-top:10px}
-        .btn-s-mode:hover:not(:disabled){background:#7c3aed}
         .control-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}
         .engine-panel{border-top:1px dashed var(--border);margin-top:20px;padding-top:10px}
         textarea{width:100%;height:120px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;color:#51ff00;font-family:monospace;padding:10px;resize:vertical;margin-bottom:12px;font-size:.85rem}
-        .file-input-wrapper{margin-bottom:12px}
-        input[type=file]{display:none}
-        .file-label{display:block;background:#334155;color:var(--text-color);padding:10px;text-align:center;border-radius:6px;cursor:pointer;font-size:.9rem;border:1px solid var(--border)}
-        .file-label:hover{background:#475569}
         .preview-box{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:12px;text-align:center}
         .preview-label{font-size:.8rem;color:var(--text-muted);margin-bottom:6px;display:flex;justify-content:space-between}
         .range-container{margin-top:16px;background:rgba(0,0,0,.1);padding:12px;border-radius:6px;border:1px solid var(--border)}
@@ -57,38 +51,21 @@
         <button class="btn btn-primary" style="background:#ffd600; color:#121212;" onclick="transmitModeToken('N')">Next Step ('N')</button>
         <button class="btn btn-warning" style="background:#06b6d4; color:#fff;" onclick="transmitModeToken('F')">Math Mode ('F')</button>
     </div>
-    
-    <button class="btn btn-s-mode" onclick="enterSMode()">S MODE</button>
 
     <div class="engine-panel">
-        <h3>CUSTOM .TXT CODE ENGINE (LAYER STREAM)</h3>
-        <div class="file-input-wrapper">
-            <label class="file-label" for="txtFileInput" id="fileInputLabel">Choose Script File (.txt)</label>
-            <input type="file" id="txtFileInput" accept=".txt" onchange="handleFileLoad(event)">
-        </div>
-        <textarea id="scriptIDE" placeholder="set(3,3,0)&#10;delay 100&#10;set(3,3,1)&#10;delay 100" oninput="parseAndCompileScript()"></textarea>
+        <h3>MATHEMATICAL FUNCTION ENGINE f(x,y,z,t)</h3>
+        <textarea id="mathIDE" placeholder="z <= 3.5 + 2.5 * sin(sqrt((x-3.5)*(x-3.5) + (y-3.5)*(y-3.5)) * 0.8 - t * 0.2)" oninput="compileMathFunction()"></textarea>
         
         <div class="preview-box">
             <div class="preview-label">
-                <span>LIVE FRAME PREVIEW (Layer 0):</span>
+                <span>LIVE FRAME PREVIEW (Frame 0):</span>
                 <span id="frameCountLabel">0 Frames Compiled</span>
             </div>
             <canvas id="layerPreviewCanvas" width="160" height="160" style="background:#000;border-radius:4px;width:120px;height:120px;image-rendering:pixelated;"></canvas>
         </div>
 
         <div class="control-group">
-            <button class="btn btn-primary" style="background:#475569" onclick="saveToStorage()">Save Script</button>
-            <button class="btn btn-primary" style="background:#475569" onclick="parseAndCompileScript()">Compile Code</button>
-        </div>
-        <button class="btn btn-s-mode" id="runScriptButton" onclick="executeSModeTransferEngine()" disabled>DRAW / RUN CUSTOM SCRIPT</button>
-    </div>
-
-    <div class="engine-panel">
-        <h3>MATHEMATICAL FUNCTION ENGINE f(x,y,z,t)</h3>
-        <textarea id="mathIDE" placeholder="z <= 3.5 + 2.5 * sin(sqrt((x-3.5)*(x-3.5) + (y-3.5)*(y-3.5)) * 0.8 - t * 0.2)" oninput="compileMathFunction()"></textarea>
-        <div class="control-group">
-            <button class="btn btn-primary" style="background:#475569" onclick="compileMathFunction()">Compile Math</button>
-            <button class="btn btn-success" id="runMathButton" onclick="executeMathStream()" disabled>Stream Math Frames</button>
+            <button class="btn btn-primary" style="background:#475569; grid-column: span 2;" onclick="compileMathFunction()">Compile Math Preview</button>
         </div>
     </div>
 
@@ -116,63 +93,19 @@
     const HM10_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
     const HM10_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
     
-    let scriptFrames = [], mathFrames = [], scriptPlaybackRunning = false, scriptPlaybackToken = 0;
+    let mathFrames = [];
     let bleWriteQueue = Promise.resolve();
     let webCubeMode = "NONE";
-
-    function updateSModeUI(){
-        const runBtn = document.getElementById("runScriptButton");
-        if(runBtn) {
-            runBtn.disabled = (webCubeMode !== "S" || !targetDataCharacteristic || scriptFrames.length === 0);
-        }
-        const runMathBtn = document.getElementById("runMathButton");
-        if(runMathBtn) {
-            runMathBtn.disabled = (webCubeMode !== "S" || !targetDataCharacteristic || mathFrames.length === 0);
-        }
-    }
      
     window.addEventListener("DOMContentLoaded", () => {
-        const cached = localStorage.getItem("cube_cached_script_layer");
-        if(cached) document.getElementById("scriptIDE").value = cached;
         const cachedMath = localStorage.getItem("cube_cached_math_expr");
         if(cachedMath) document.getElementById("mathIDE").value = cachedMath;
         else document.getElementById("mathIDE").value = "z <= 3.5 + 2.5 * sin(sqrt((x-3.5)*(x-3.5) + (y-3.5)*(y-3.5)) * 0.8 - t * 0.2)";
         const cachedCustom = localStorage.getItem("cube_cached_custom_func");
         if(cachedCustom) document.getElementById("customFuncIDE").value = cachedCustom;
         else document.getElementById("customFuncIDE").value = "CUSTOM\nH=(X*3+Y*5+F)%16\nIF H>=8 OFF\nRZ=7-H\nZ=RZ OR Z=RZ+1\nEND";
-        parseAndCompileScript();
         compileMathFunction();
-        updateSModeUI();
     });
-
-    function saveToStorage(){
-        const code = document.getElementById("scriptIDE").value;
-        localStorage.setItem("cube_cached_script_layer", code);
-        alert("Script saved successfully!");
-    }
-
-    function handleFileLoad(event){
-        const input = event.target;
-        if(!input.files || !input.files.length) return;
-        const file = input.files[0];
-        document.getElementById("fileInputLabel").innerText = file.name;
-
-        const reader = new FileReader();
-        reader.onload = () => {
-            document.getElementById("scriptIDE").value = reader.result;
-            localStorage.setItem("cube_cached_script_layer", reader.result);
-            const count = parseAndCompileScript();
-            document.getElementById("connectionLog").innerText = "SCRIPT LOADED: " + count + " FRAME(S)";
-        };
-        reader.readAsText(file);
-    }
-
-    function parseDelayCommand(line){
-        const m = line.match(/^delay\s*(?:\(\s*)?(\d+)(?:\s*\))?\s*$/i);
-        if(!m) return null;
-        const value = parseInt(m[1], 10);
-        return Number.isFinite(value) ? Math.max(0, value) : null;
-    }
 
     function drawPreview(frameBytes){
         const canvas = document.getElementById("layerPreviewCanvas");
@@ -199,80 +132,6 @@
         }
     }
 
-    function parseAndCompileScript(){
-        scriptFrames = [];
-        const scriptElem = document.getElementById("scriptIDE");
-        if(!scriptElem) return 0;
-        const lines = scriptElem.value.split(/\r?\n/);
-        let frameBytes = new Uint8Array(64);
-        let frameOpen = false;
-        let hasCommands = false;
-        let pendingDelay = null;
-        const defaultDelay = 250;
-
-        function pushFrame(force = false){
-            if(!hasCommands && !force) return;
-            scriptFrames.push({bytes: frameBytes.slice(), delay: (pendingDelay === null ? defaultDelay : pendingDelay)});
-            frameBytes = new Uint8Array(64);
-            pendingDelay = null;
-            hasCommands = false;
-            frameOpen = false;
-        }
-
-        for(let line of lines){
-            line = line.trim();
-            if(!line || line.startsWith("//") || line.startsWith("#")) continue;
-            const upper = line.toUpperCase();
-
-            if(upper === "FRAME_START"){
-                if(hasCommands) pushFrame();
-                frameOpen = true;
-                frameBytes = new Uint8Array(64);
-                hasCommands = false;
-                pendingDelay = null;
-                continue;
-            }
-
-            if(upper === "FRAME_END"){
-                pushFrame(true);
-                continue;
-            }
-
-            const delay = parseDelayCommand(line);
-            if(delay !== null){
-                pendingDelay = delay;
-                if(hasCommands && !frameOpen) pushFrame();
-                continue;
-            }
-
-            if(upper === "NEXT"){
-                if(hasCommands) pushFrame();
-                else if(frameOpen) pushFrame(true);
-                continue;
-            }
-
-            const m = line.match(/set\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-            if(!m) continue;
-
-            const x = parseInt(m[1], 10), y = parseInt(m[2], 10), z = parseInt(m[3], 10);
-            if(x < 0 || x >= 8 || y < 0 || y >= 8 || z < 0 || z >= 8) continue;
-
-            const index = z * 64 + y * 8 + x;
-            const byteIndex = index >> 3;
-            const bitIndex = index & 7;
-            frameBytes[byteIndex] |= (1 << bitIndex);
-            hasCommands = true;
-        }
-
-        if(hasCommands) pushFrame();
-        const count = scriptFrames.length;
-        const frameCountLabel = document.getElementById("frameCountLabel");
-        if(frameCountLabel) frameCountLabel.innerText = count + " Frame(s) Compiled";
-        if(count > 0) drawPreview(scriptFrames[0].bytes);
-        updateSModeUI();
-        return count;
-    }
-
     function compileMathFunction(){
         mathFrames = [];
         const exprElem = document.getElementById("mathIDE");
@@ -280,7 +139,7 @@
         const exprStr = exprElem.value.trim();
         localStorage.setItem("cube_cached_math_expr", exprStr);
 
-        // Generate 50 frames for the animation loop
+        // Generate 50 frames for the animation loop preview
         const totalFrames = 50;
         for(let f = 0; f < totalFrames; f++){
             let frameBytes = new Uint8Array(64);
@@ -306,8 +165,10 @@
             }
             mathFrames.push({bytes: frameBytes, delay: 100});
         }
+        const count = mathFrames.length;
+        const frameCountLabel = document.getElementById("frameCountLabel");
+        if(frameCountLabel) frameCountLabel.innerText = count + " Frame(s) Compiled";
         if(mathFrames.length > 0) drawPreview(mathFrames[0].bytes);
-        updateSModeUI();
         return mathFrames.length;
     }
 
@@ -333,18 +194,12 @@
             document.getElementById('disconnectBtn').style.display = "block";
 
             webCubeMode = "NONE";
-            scriptPlaybackRunning = false;
-            scriptPlaybackToken++;
-            updateSModeUI();
 
             physicalTargetDevice.addEventListener("gattserverdisconnected", cleanSessionStateWipe);
         }catch(e){
             console.error(e);
             targetDataCharacteristic = null;
             webCubeMode = "NONE";
-            scriptPlaybackRunning = false;
-            scriptPlaybackToken++;
-            updateSModeUI();
             log.innerText = "CONNECTION FAILED";
             log.className = "status-panel status-disconnected";
             alert("Connection Failed: " + e.message);
@@ -352,12 +207,9 @@
     }
 
     function cleanSessionStateWipe(){
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
         targetDataCharacteristic = null;
         physicalTargetDevice = null;
         webCubeMode = "NONE";
-        updateSModeUI();
         const log = document.getElementById('connectionLog');
         log.innerText = "DISCONNECTED";
         log.className = "status-panel status-disconnected";
@@ -366,11 +218,8 @@
     }
 
     async function terminateConnectionSequence(){
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
         targetDataCharacteristic = null;
         webCubeMode = "NONE";
-        updateSModeUI();
         if(physicalTargetDevice && physicalTargetDevice.gatt.connected){
             try {
                 await transmitModeToken('Q');
@@ -380,14 +229,12 @@
         cleanSessionStateWipe();
     }
 
-    function queueBLEWrite(data, token = null){
+    function queueBLEWrite(data){
         bleWriteQueue = bleWriteQueue.catch(() => {}).then(async() => {
             if(!targetDataCharacteristic) throw new Error("Bluetooth disconnected.");
-            if(token !== null && token !== scriptPlaybackToken) return;
 
             let attempts = 0;
             while(attempts < 5){
-                if(token !== null && token !== scriptPlaybackToken) return;
                 try{
                     await targetDataCharacteristic.writeValueWithoutResponse(data);
                     return;
@@ -405,7 +252,6 @@
 
     async function executeBrightnessShift(val){
         document.getElementById("sliderValLabel").innerText = val;
-        if(webCubeMode === "S") return;
         try{
             await queueBLEWrite(new Uint8Array([0x42, parseInt(val, 10)]));
         }catch(e){
@@ -417,177 +263,16 @@
         if(!targetDataCharacteristic) return;
         if(c === "N" && webCubeMode !== "M") return;
 
-        const leavingS = (webCubeMode === "S" && (c === "A" || c === "M" || c === "F" || c === "Q"));
-
-        if(c === "A" || c === "M" || c === "F" || c === "Q"){
-            scriptPlaybackRunning = false;
-            scriptPlaybackToken++;
-        }
-
         if(c === "A") webCubeMode = "A";
         else if(c === "M") webCubeMode = "M";
         else if(c === "F") webCubeMode = "F";
         else if(c === "Q") webCubeMode = "A";
 
-        updateSModeUI();
-
         try{
-            if(leavingS) await new Promise(r => setTimeout(r, 150));
             const encoder = new TextEncoder();
             await queueBLEWrite(encoder.encode(c));
         }catch(e){
             console.error("Mode command:", e);
-        }
-    }
-
-    async function enterSMode(){
-        if(!targetDataCharacteristic){
-            alert("Please connect to Bluetooth HM-10 first!");
-            return;
-        }
-
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
-        webCubeMode = "S";
-        updateSModeUI();
-        const log = document.getElementById("connectionLog");
-
-        try{
-            await bleWriteQueue.catch(() => {});
-            const packet = new Uint8Array([0xFF, 0x53]);
-            await queueBLEWrite(packet);
-
-            if(targetDataCharacteristic && webCubeMode === "S"){
-                log.innerText = "CONNECTED (S MODE / LAYER STREAM)";
-                log.style.color = "#8b5cf6";
-            }
-        }catch(e){
-            webCubeMode = "NONE";
-            updateSModeUI();
-            log.innerText = "S MODE ENTRY FAILED";
-            log.style.color = "var(--danger)";
-            alert("S-Mode entry failed: " + e.message);
-        }
-    }
-
-    async function sendSingleScriptFrame(frameBytes, token){
-        if(!(frameBytes instanceof Uint8Array) || frameBytes.length !== 64){
-            throw new Error("S frame must contain exactly 64 bytes");
-        }
-
-        for(let layer = 0; layer < 8; layer++){
-            if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") return false;
-
-            const layerData = frameBytes.slice(layer * 8, (layer + 1) * 8);
-            const packet = new Uint8Array(9);
-            packet[0] = (1 << layer);
-            packet.set(layerData, 1);
-
-            await queueBLEWrite(packet, token);
-            await new Promise(r => setTimeout(r, 2));
-        }
-        return true;
-    }
-
-    async function executeSModeTransferEngine(){
-        if(!targetDataCharacteristic){
-            alert("Please connect to Bluetooth HM-10 first!");
-            return;
-        }
-
-        if(webCubeMode !== "S"){
-            alert("Enter S MODE first.");
-            return;
-        }
-
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
-        const token = scriptPlaybackToken;
-
-        await bleWriteQueue.catch(() => {});
-        if(token !== scriptPlaybackToken || webCubeMode !== "S") return;
-
-        if(!parseAndCompileScript()){
-            alert("No valid frames found.");
-            return;
-        }
-
-        scriptPlaybackRunning = true;
-        const log = document.getElementById("connectionLog");
-        log.innerText = "STREAMING " + scriptFrames.length + " LAYER FRAMES...";
-        log.style.color = "#8b5cf6";
-
-        try{
-            while(scriptPlaybackRunning && token === scriptPlaybackToken && webCubeMode === "S"){
-                for(const frame of scriptFrames){
-                    if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") break;
-                    drawPreview(frame.bytes);
-                    const ok = await sendSingleScriptFrame(frame.bytes, token);
-                    if(!ok) break;
-                    await new Promise(r => setTimeout(r, frame.delay));
-                }
-            }
-        }catch(e){
-            scriptPlaybackRunning = false;
-            log.innerText = "TRANSMISSION ERROR";
-            log.style.color = "var(--danger)";
-            console.error("S-Mode:", e);
-            return;
-        }
-
-        if(targetDataCharacteristic && webCubeMode === "S" && token === scriptPlaybackToken){
-            log.innerText = "CONNECTED (S MODE)";
-        }
-    }
-
-    async function executeMathStream(){
-        if(!targetDataCharacteristic){
-            alert("Please connect to Bluetooth HM-10 first!");
-            return;
-        }
-
-        if(webCubeMode !== "S"){
-            alert("Enter S MODE first.");
-            return;
-        }
-
-        scriptPlaybackRunning = false;
-        scriptPlaybackToken++;
-        const token = scriptPlaybackToken;
-
-        await bleWriteQueue.catch(() => {});
-        if(token !== scriptPlaybackToken || webCubeMode !== "S") return;
-
-        if(mathFrames.length === 0){
-            alert("No valid math frames compiled.");
-            return;
-        }
-
-        scriptPlaybackRunning = true;
-        const log = document.getElementById("connectionLog");
-        log.innerText = "STREAMING MATH FUNCTION FRAMES...";
-        log.style.color = "#8b5cf6";
-
-        try{
-            while(scriptPlaybackRunning && token === scriptPlaybackToken && webCubeMode === "S"){
-                for(const frame of mathFrames){
-                    if(!scriptPlaybackRunning || token !== scriptPlaybackToken || webCubeMode !== "S") break;
-                    drawPreview(frame.bytes);
-                    const ok = await sendSingleScriptFrame(frame.bytes, token);
-                    if(!ok) break;
-                    await new Promise(r => setTimeout(r, frame.delay));
-                }
-            }
-        }catch(e){
-            scriptPlaybackRunning = false;
-            log.innerText = "TRANSMISSION ERROR";
-            log.style.color = "var(--danger)";
-            console.error("Math Stream:", e);
-            return;
-        }
-
-        if(targetDataCharacteristic && webCubeMode === "S" && token === scriptPlaybackToken){
-            log.innerText = "CONNECTED (S MODE)";
         }
     }
 
