@@ -7,14 +7,13 @@ const byte DATA_PIN = 11, CLOCK_PIN = 13, LATCH_PIN = 12, TOUCH_PIN = 10, POT_PI
 AltSoftSerial bluetooth;
 
 volatile byte currentCubeMode = 0; // 0 Auto, 1 Manual, 3 Math Mode, 4 Custom Engine (Mode 2 is Reserved)
-byte globalBrightness = 4;
+byte globalBrightness = 5;
 unsigned int animationIndex = 0; 
 byte frameCounter = 0;
 const unsigned int TOTAL_ANIMATIONS = 24, FRAME_TIME = 200;
 const unsigned long AUTO_MODE_CAROUSEL_TIME = 10000UL;
 unsigned long lastFrameTime = 0, animationStart = 0;
 
-// Display Buffers & State variables (Defined before use)
 volatile byte displayBuffer[8][8]; 
 byte parseMode = 0; 
 byte backBuffer[8][8]; 
@@ -24,10 +23,7 @@ bool lastBluetoothConnected = false;
 unsigned long bluetoothStateChangedAt = 0;
 const unsigned long BLE_STATE_DEBOUNCE_TIME = 3000UL;
 
-struct ColumnMap { 
-  byte reg; 
-  byte bit; 
-};
+struct ColumnMap { byte reg; byte bit; };
 
 const ColumnMap COLUMN_MAP[64] = {
   {1,0},{1,1},{1,2},{1,3},{1,4},{1,5},{1,6},{1,7},
@@ -43,33 +39,14 @@ const ColumnMap COLUMN_MAP[64] = {
 inline byte columnIndex(byte x, byte y){ return y*8+x; }
 
 void triggerModeBlinkAcknowledgment(){
-  for(byte z = 0; z < 8; z++){
-    for(byte r = 0; r < 8; r++){
-      displayBuffer[z][r] = 0xFF;
-    }
-  }
+  for(byte z = 0; z < 8; z++) for(byte r = 0; r < 8; r++) displayBuffer[z][r] = 0xFF;
   delay(80);
-  for(byte z = 0; z < 8; z++){
-    for(byte r = 0; r < 8; r++){
-      displayBuffer[z][r] = 0x00;
-    }
-  }
+  for(byte z = 0; z < 8; z++) for(byte r = 0; r < 8; r++) displayBuffer[z][r] = 0x00;
   delay(80);
 }
 
-// Custom Function Engine (Mode 4)
-enum OpCode {
-  OP_NONE = 0,
-  OP_CALC_H,
-  OP_CHECK_H_GE_8,
-  OP_CALC_RZ,
-  OP_CHECK_Z_MATCH
-};
-
-struct CompiledInstruction {
-  OpCode op;
-};
-
+enum OpCode { OP_NONE = 0, OP_CALC_H, OP_CHECK_H_GE_8, OP_CALC_RZ, OP_CHECK_Z_MATCH };
+struct CompiledInstruction { OpCode op; };
 CompiledInstruction compiledProgram[16];
 byte programLength = 4;
 char customRxBuf[32];
@@ -84,23 +61,14 @@ void initDefaultCustomProgram() {
 }
 
 bool evaluateCustomFunction(byte x, byte y, byte z, byte f) {
-  int H = 0;
-  int RZ = 0;
+  int H = 0, RZ = 0;
   for(byte i = 0; i < programLength; i++) {
     switch(compiledProgram[i].op) {
-      case OP_CALC_H:
-        H = ( (int)x * 3 + (int)y * 5 + (int)f ) % 16;
-        break;
-      case OP_CHECK_H_GE_8:
-        if (H >= 8) return false;
-        break;
-      case OP_CALC_RZ:
-        RZ = 7 - H;
-        break;
-      case OP_CHECK_Z_MATCH:
-        return (z == RZ) || ((RZ < 7) && (z == RZ + 1));
-      default:
-        break;
+      case OP_CALC_H: H = ((int)x * 3 + (int)y * 5 + (int)f) % 16; break;
+      case OP_CHECK_H_GE_8: if(H >= 8) return false; break;
+      case OP_CALC_RZ: RZ = 7 - H; break;
+      case OP_CHECK_Z_MATCH: return (z == RZ) || ((RZ < 7) && (z == RZ + 1));
+      default: break;
     }
   }
   return false;
@@ -110,18 +78,14 @@ void drawCustomFunctionFrame(byte f){
   byte localMatrix[8][8];
   for(byte z = 0; z < 8; z++){
     for(byte r = 0; r < 8; r++) localMatrix[z][r] = 0;
-    for(byte y = 0; y < 8; y++){
-      for(byte x = 0; x < 8; x++){
-        if(evaluateCustomFunction(x, y, z, f)){
-          byte c = columnIndex(x, y), reg = COLUMN_MAP[c].reg, bit = COLUMN_MAP[c].bit;
-          if(reg >= 1 && reg <= 8 && bit <= 7) localMatrix[z][reg - 1] |= (1 << bit);
-        }
+    for(byte y = 0; y < 8; y++) for(byte x = 0; x < 8; x++){
+      if(evaluateCustomFunction(x, y, z, f)){
+        byte c = columnIndex(x, y), reg = COLUMN_MAP[c].reg, bit = COLUMN_MAP[c].bit;
+        if(reg >= 1 && reg <= 8 && bit <= 7) localMatrix[z][reg - 1] |= (1 << bit);
       }
     }
   }
-  noInterrupts();
-  memcpy((void*)displayBuffer, localMatrix, 64);
-  interrupts();
+  noInterrupts(); memcpy((void*)displayBuffer, localMatrix, 64); interrupts();
 }
 
 void parseCustomFunctionStream(char c) {
@@ -131,7 +95,6 @@ void parseCustomFunctionStream(char c) {
       String line = String(customRxBuf);
       line.trim();
       line.toUpperCase();
-      
       if(line == "CUSTOM" || line == "CF_BEGIN") {
         programLength = 0;
         currentCubeMode = 4;
@@ -144,52 +107,31 @@ void parseCustomFunctionStream(char c) {
         currentCubeMode = 0;
         triggerModeBlinkAcknowledgment();
       } else {
-        if(line.indexOf("H=") != -1 || line.indexOf("%16") != -1) {
-          if(programLength < 16) compiledProgram[programLength++].op = OP_CALC_H;
-        }
-        if(line.indexOf("IF") != -1 && line.indexOf(">=8") != -1) {
-          if(programLength < 16) compiledProgram[programLength++].op = OP_CHECK_H_GE_8;
-        }
-        if(line.indexOf("RZ=") != -1 || line.indexOf("7-H") != -1) {
-          if(programLength < 16) compiledProgram[programLength++].op = OP_CALC_RZ;
-        }
-        if(line.indexOf("Z=") != -1 || line.indexOf("OR") != -1 || line.indexOf("RZ+1") != -1) {
-          if(programLength < 16) compiledProgram[programLength++].op = OP_CHECK_Z_MATCH;
-        }
+        if(line.indexOf("H=") != -1 || line.indexOf("%16") != -1) if(programLength < 16) compiledProgram[programLength++].op = OP_CALC_H;
+        if(line.indexOf("IF") != -1 && line.indexOf(">=8") != -1) if(programLength < 16) compiledProgram[programLength++].op = OP_CHECK_H_GE_8;
+        if(line.indexOf("RZ=") != -1 || line.indexOf("7-H") != -1) if(programLength < 16) compiledProgram[programLength++].op = OP_CALC_RZ;
+        if(line.indexOf("Z=") != -1 || line.indexOf("OR") != -1 || line.indexOf("RZ+1") != -1) if(programLength < 16) compiledProgram[programLength++].op = OP_CHECK_Z_MATCH;
       }
       customRxIdx = 0;
     }
-  } else {
-    if(customRxIdx < 31) {
-      customRxBuf[customRxIdx++] = c;
-    }
-  }
+  } else if(customRxIdx < 31) customRxBuf[customRxIdx++] = c;
 }
 
 inline void shiftByteFast(byte value){
   for(int8_t bit = 7; bit >= 0; bit--){
-    if(value & (1 << bit)) PORTB |= _BV(PB3); 
-    else PORTB &= ~_BV(PB3);
-    PORTB |= _BV(PB5); 
-    PORTB &= ~_BV(PB5);
+    if(value & (1 << bit)) PORTB |= _BV(PB3); else PORTB &= ~_BV(PB3);
+    PORTB |= _BV(PB5); PORTB &= ~_BV(PB5);
   }
 }
-
-inline void latchFast(){
-  PORTB |= _BV(PB4); 
-  PORTB &= ~_BV(PB4);
-}
+inline void latchFast(){ PORTB |= _BV(PB4); PORTB &= ~_BV(PB4); }
 
 void refreshDisplay(){
   static byte layer = 0;
   brightnessAccumulator[layer] += globalBrightness;
   bool en = brightnessAccumulator[layer] >= 8;
   if(en) brightnessAccumulator[layer] -= 8;
-  
   shiftByteFast(en ? (1 << layer) : 0);
-  for(int8_t r = 7; r >= 0; r--){
-    shiftByteFast(displayBuffer[layer][r]);
-  }
+  for(int8_t r = 7; r >= 0; r--) shiftByteFast(displayBuffer[layer][r]);
   latchFast();
   layer = (layer + 1) % 8;
 }
@@ -208,31 +150,26 @@ inline bool isOuterRing(byte x, byte y){ return x == 0 || x == 7 || y == 0 || y 
 byte perimeterIndex(byte x, byte y){ if(y == 0) return x; if(x == 7) return 7 + y; if(y == 7) return 21 - x; return 21 + (7 - y); }
 
 bool mathFunctionVoxel(byte f, byte x, byte y, byte z){
-  // Mathematical wave function: z <= 3.5 + 2.5 * sin(sqrt((x-3.5)*(x-3.5) + (y-3.5)*(y-3.5)) * 0.8 - f * 0.2)
   float fx = (float)x - 3.5f;
   float fy = (float)y - 3.5f;
   float dist = sqrt(fx * fx + fy * fy);
   float waveZ = 3.5f + 2.5f * sin(dist * 0.8f - (float)f * 0.2f);
   int targetZ = (int)(waveZ + 0.5f);
-  return z == targetZ;
+  return z <= targetZ;
 }
 
 void drawMathFrame(byte f){
   byte localMatrix[8][8];
   for(byte z = 0; z < 8; z++){
     for(byte r = 0; r < 8; r++) localMatrix[z][r] = 0;
-    for(byte y = 0; y < 8; y++){
-      for(byte x = 0; x < 8; x++){
-        if(mathFunctionVoxel(f, x, y, z)){
-          byte c = columnIndex(x, y), reg = COLUMN_MAP[c].reg, bit = COLUMN_MAP[c].bit;
-          if(reg >= 1 && reg <= 8 && bit <= 7) localMatrix[z][reg - 1] |= (1 << bit);
-        }
+    for(byte y = 0; y < 8; y++) for(byte x = 0; x < 8; x++){
+      if(mathFunctionVoxel(f, x, y, z)){
+        byte c = columnIndex(x, y), reg = COLUMN_MAP[c].reg, bit = COLUMN_MAP[c].bit;
+        if(reg >= 1 && reg <= 8 && bit <= 7) localMatrix[z][reg - 1] |= (1 << bit);
       }
     }
   }
-  noInterrupts();
-  memcpy((void*)displayBuffer, localMatrix, 64);
-  interrupts();
+  noInterrupts(); memcpy((void*)displayBuffer, localMatrix, 64); interrupts();
 }
 
 bool animationVoxel(byte a, byte f, byte x, byte y, byte z){
@@ -267,64 +204,27 @@ void drawAnimationFrame(byte a, byte f){
   byte localMatrix[8][8];
   for(byte z = 0; z < 8; z++){
     for(byte r = 0; r < 8; r++) localMatrix[z][r] = 0;
-    for(byte y = 0; y < 8; y++){
-      for(byte x = 0; x < 8; x++){
-        if(animationVoxel(a, f, x, y, z)){
-          byte c = columnIndex(x, y), reg = COLUMN_MAP[c].reg, bit = COLUMN_MAP[c].bit;
-          if(reg >= 1 && reg <= 8 && bit <= 7) localMatrix[z][reg - 1] |= (1 << bit);
-        }
+    for(byte y = 0; y < 8; y++) for(byte x = 0; x < 8; x++){
+      if(animationVoxel(a, f, x, y, z)){
+        byte c = columnIndex(x, y), reg = COLUMN_MAP[c].reg, bit = COLUMN_MAP[c].bit;
+        if(reg >= 1 && reg <= 8 && bit <= 7) localMatrix[z][reg - 1] |= (1 << bit);
       }
     }
   }
-  noInterrupts();
-  memcpy((void*)displayBuffer, localMatrix, 64);
-  interrupts();
+  noInterrupts(); memcpy((void*)displayBuffer, localMatrix, 64); interrupts();
 }
 
 void handleScriptControl(byte cmd){
-  if(cmd == 0x41 || cmd == 0x51 || cmd == 'A' || cmd == 'Q'){ 
-    currentCubeMode = 0;
-
-    parseMode = 0;
-    animationStart = millis();
-    lastFrameTime = animationStart;
-    triggerModeBlinkAcknowledgment();
-  } else if(cmd == 0x4D || cmd == 'M'){ 
-    currentCubeMode = 1;
-
-    parseMode = 0;
-    animationStart = millis();
-    lastFrameTime = animationStart;
-    triggerModeBlinkAcknowledgment();
-  } else if(cmd == 0x46 || cmd == 'F'){
-    currentCubeMode = 3;
-    memset((void*)displayBuffer, 0, 64);
-    parseMode = 0;
-    animationStart = millis();
-    lastFrameTime = millis();
-    triggerModeBlinkAcknowledgment();
-  } else if(cmd == 0x58 || cmd == 'X'){
-    currentCubeMode = 4;
-    memset((void*)displayBuffer, 0, 64);
-    parseMode = 0;
-    animationStart = millis();
-    lastFrameTime = millis();
-    triggerModeBlinkAcknowledgment();
-  }
+  if(cmd == 0x41 || cmd == 0x51 || cmd == 'A' || cmd == 'Q'){ currentCubeMode = 0; parseMode = 0; animationStart = millis(); lastFrameTime = animationStart; triggerModeBlinkAcknowledgment(); }
+  else if(cmd == 0x4D || cmd == 'M'){ currentCubeMode = 1; parseMode = 0; animationStart = millis(); lastFrameTime = animationStart; triggerModeBlinkAcknowledgment(); }
+  else if(cmd == 0x46 || cmd == 'F'){ currentCubeMode = 3; memset((void*)displayBuffer, 0, 64); parseMode = 0; animationStart = millis(); lastFrameTime = millis(); triggerModeBlinkAcknowledgment(); }
+  else if(cmd == 0x58 || cmd == 'X'){ currentCubeMode = 4; memset((void*)displayBuffer, 0, 64); parseMode = 0; animationStart = millis(); lastFrameTime = millis(); triggerModeBlinkAcknowledgment(); }
 }
 
 void setup(){
-  pinMode(DATA_PIN, OUTPUT);
-  pinMode(CLOCK_PIN, OUTPUT);
-  pinMode(LATCH_PIN, OUTPUT);
-  pinMode(TOUCH_PIN, INPUT);
-  pinMode(BLE_STATE_PIN, INPUT);
+  pinMode(DATA_PIN, OUTPUT); pinMode(CLOCK_PIN, OUTPUT); pinMode(LATCH_PIN, OUTPUT); pinMode(TOUCH_PIN, INPUT); pinMode(BLE_STATE_PIN, INPUT);
   PORTB &= ~(_BV(PB3) | _BV(PB4) | _BV(PB5));
-  bluetooth.begin(9600);
-  initDefaultCustomProgram();
-  startRefreshTimer();
-  animationStart = millis();
-  lastFrameTime = millis();
+  bluetooth.begin(9600); initDefaultCustomProgram(); startRefreshTimer(); animationStart = millis(); lastFrameTime = millis();
 }
 
 void loop(){
@@ -333,64 +233,23 @@ void loop(){
   if(ble != lastBluetoothConnected){
     if(bluetoothStateChangedAt == 0) bluetoothStateChangedAt = now;
     else if(now - bluetoothStateChangedAt >= BLE_STATE_DEBOUNCE_TIME){
-      lastBluetoothConnected = ble;
-      bluetoothStateChangedAt = 0;
-      if(!lastBluetoothConnected){
-        currentCubeMode = 0;
-    
-        parseMode = 0;
-        animationStart = now;
-        lastFrameTime = now;
-        triggerModeBlinkAcknowledgment();
-      }
+      lastBluetoothConnected = ble; bluetoothStateChangedAt = 0;
+      if(!lastBluetoothConnected){ currentCubeMode = 0; parseMode = 0; animationStart = now; lastFrameTime = now; triggerModeBlinkAcknowledgment(); }
     }
-  } else {
-    bluetoothStateChangedAt = 0;
-  }
+  } else bluetoothStateChangedAt = 0;
 
-  if(!lastBluetoothConnected) {
-    int raw = analogRead(POT_PIN);
-    globalBrightness = map(raw, 0, 1023, 2, 8);
-  }
+  if(!lastBluetoothConnected){ int raw = analogRead(POT_PIN); globalBrightness = map(raw, 0, 1023, 2, 8); }
 
-  static bool lastTouch = false; 
-  static unsigned long touchTimer = 0; 
-  static bool longPress = false;
-  bool touch = digitalRead(TOUCH_PIN) == HIGH;
-  if(lastBluetoothConnected) touch = false;
-  
-  if(touch && !lastTouch){
-    touchTimer = now; 
-    longPress = false;
-  } else if(touch && lastTouch){
-    unsigned long d = now - touchTimer;
-    if(!longPress && d >= 3000UL){
-      currentCubeMode = (currentCubeMode == 0) ? 1 : 0;
-  
-      triggerModeBlinkAcknowledgment();
-      longPress = true;
-      animationStart = now; 
-      lastFrameTime = now;
-    }
-  } else if(!touch && lastTouch){
-    unsigned long d = now - touchTimer;
-    if(!longPress && currentCubeMode == 1 && d >= 50 && d < 3000UL){
-      animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS;
-      frameCounter = 0;
-      animationStart = now; 
-      lastFrameTime = now;
-      drawAnimationFrame(animationIndex, frameCounter);
-    }
-  }
+  static bool lastTouch = false; static unsigned long touchTimer = 0; static bool longPress = false;
+  bool touch = digitalRead(TOUCH_PIN) == HIGH; if(lastBluetoothConnected) touch = false;
+  if(touch && !lastTouch){ touchTimer = now; longPress = false; }
+  else if(touch && lastTouch){ unsigned long d = now - touchTimer; if(!longPress && d >= 3000UL){ currentCubeMode = (currentCubeMode == 0) ? 1 : 0; triggerModeBlinkAcknowledgment(); longPress = true; animationStart = now; lastFrameTime = now; } }
+  else if(!touch && lastTouch){ unsigned long d = now - touchTimer; if(!longPress && currentCubeMode == 1 && d >= 50 && d < 3000UL){ animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS; frameCounter = 0; animationStart = now; lastFrameTime = now; drawAnimationFrame(animationIndex, frameCounter); } }
   lastTouch = touch;
 
   while(bluetooth.available() > 0){
     byte in = bluetooth.read();
-    if(parseMode == 5){
-      parseCustomFunctionStream((char)in);
-      continue;
-    }
-
+    if(parseMode == 5){ parseCustomFunctionStream((char)in); continue; }
     if(parseMode == 0){
       if(in == 'A' || in == 0x41 || in == 0x51){ currentCubeMode = 0; animationStart = now; lastFrameTime = now; triggerModeBlinkAcknowledgment(); }
       else if(in == 'M' || in == 0x4D){ currentCubeMode = 1; animationStart = now; lastFrameTime = now; triggerModeBlinkAcknowledgment(); }
@@ -401,41 +260,17 @@ void loop(){
       else if(in == 'N' && currentCubeMode == 1){ animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS; frameCounter = 0; lastFrameTime = now; drawAnimationFrame(animationIndex, frameCounter); }
       else if(in == 'Q'){ currentCubeMode = 0; animationStart = now; lastFrameTime = now; triggerModeBlinkAcknowledgment(); }
       else if(in == 'B'){ parseMode = 4; }
-    } else if(parseMode == 4){
-      if(in >= 2 && in <= 8) globalBrightness = in;
-      parseMode = 0;
-    }
+    } else if(parseMode == 4){ if(in >= 2 && in <= 8) globalBrightness = in; parseMode = 0; }
   }
 
   if(currentCubeMode == 0){
-    if(now - animationStart >= AUTO_MODE_CAROUSEL_TIME){
-      animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS;
-      frameCounter = 0;
-      animationStart = now; 
-      lastFrameTime = now;
-    }
-    if(now - lastFrameTime >= FRAME_TIME){
-      lastFrameTime = now;
-      drawAnimationFrame(animationIndex, frameCounter);
-      frameCounter = (frameCounter + 1) % 50;
-    }
+    if(now - animationStart >= AUTO_MODE_CAROUSEL_TIME){ animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS; frameCounter = 0; animationStart = now; lastFrameTime = now; }
+    if(now - lastFrameTime >= FRAME_TIME){ lastFrameTime = now; drawAnimationFrame(animationIndex, frameCounter); frameCounter = (frameCounter + 1) % 50; }
   } else if(currentCubeMode == 1){
-    if(now - lastFrameTime >= FRAME_TIME){
-      lastFrameTime = now;
-      drawAnimationFrame(animationIndex, frameCounter);
-      frameCounter = (frameCounter + 1) % 50;
-    }
+    if(now - lastFrameTime >= FRAME_TIME){ lastFrameTime = now; drawAnimationFrame(animationIndex, frameCounter); frameCounter = (frameCounter + 1) % 50; }
   } else if(currentCubeMode == 3){
-    if(now - lastFrameTime >= FRAME_TIME){
-      lastFrameTime = now;
-      drawMathFrame(frameCounter);
-      frameCounter = (frameCounter + 1) % 50;
-    }
+    if(now - lastFrameTime >= FRAME_TIME){ lastFrameTime = now; drawMathFrame(frameCounter); frameCounter = (frameCounter + 1) % 50; }
   } else if(currentCubeMode == 4){
-    if(now - lastFrameTime >= FRAME_TIME){
-      lastFrameTime = now;
-      drawCustomFunctionFrame(frameCounter);
-      frameCounter = (frameCounter + 1) % 50;
-    }
+    if(now - lastFrameTime >= FRAME_TIME){ lastFrameTime = now; drawCustomFunctionFrame(frameCounter); frameCounter = (frameCounter + 1) % 50; }
   }
 }
