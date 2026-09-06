@@ -1,0 +1,3 @@
+# Protect the project editing policy file.
+# Any pull request that changes VERSION_CONTROL.md should require review from the repository owner.
+VERSION_CONTROL.md @faizulahasun-cloud
