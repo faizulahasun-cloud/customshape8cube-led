@@ -4,6 +4,25 @@ This file records the important behavior that must NOT be accidentally removed o
 
 Before changing the Arduino or web code, check this table first.
 
+## 0. Change authorization rule — MANDATORY
+
+This section controls whether any repository file may be modified.
+
+**Analyze first. Modify only when explicitly authorized by the user.**
+
+1. First inspect the current file/content and determine whether a change is actually needed.
+2. The fact that a change appears useful, necessary, safer, cleaner, or implied by the project does **NOT** grant permission to modify it.
+3. A request to **analyze, inspect, check, compare, report, explain, or verify** means **NO code modification** unless the user separately and explicitly authorizes a modification.
+4. When the user authorizes a change, modify **only the file(s) and behavior explicitly authorized**, unless the user clearly authorizes related files as well.
+5. Do not modify the Arduino `.ino` merely because an MD rule says a behavior should exist. First report whether the current Arduino code already satisfies that rule; obtain explicit authorization before changing the `.ino`.
+6. Do not modify HTML, Arduino, or other project files while the user is asking only to update this contract/documentation.
+7. Before every write operation, identify the exact file being changed and confirm that the user's latest instruction authorizes that file and change.
+8. If a requested behavior is missing but the user has not authorized code changes, **report the missing behavior and stop without modifying the code**.
+9. Never treat this document as permission to implement its requirements. It is a preservation/verification contract, not an automatic change request.
+10. When a file is authorized for modification, preserve all unrelated existing functionality and make the smallest necessary change.
+
+**Priority rule:** User's explicit modification instruction > this contract's recommendations. This contract never overrides a user's instruction and never creates permission by itself.
+
 ## 1. Main control logic
 
 | Rule | Required behavior | Where it belongs |
@@ -143,6 +162,9 @@ Before committing a change, verify:
 
 | Check | Must remain true |
 |---|---|
+| Authorization | Only explicitly user-authorized files/changes are modified |
+| Analyze first | Current content is inspected before deciding whether a change is needed |
+| No implicit permission | A documented requirement never by itself authorizes changing code |
 | Startup delay | Arduino waits 3 seconds after power-up before starting built-in Auto animation |
 | Disconnect fallback | Bluetooth loss still returns to built-in Auto Mode |
 | Handshake | `H` still gets `HANDSHAKE_OK` reliably |
@@ -160,6 +182,10 @@ Before committing a change, verify:
 
 ## Golden rule
 
-**Do not judge a future change only by whether the new feature works. Also verify that every existing rule in this document still works.**
+**Analyze first. Never modify code or another project file unless the user explicitly authorizes that modification.**
+
+After authorization, make the smallest necessary change, preserve unrelated behavior, and verify every existing rule in this document still works.
+
+Do not judge a future change only by whether the new feature works. Also verify that every existing rule in this document still works.
 
 When modifying either file, review this contract first and specifically check for missing logic, removed fallback behavior, changed command meanings, ACK races, startup delay removal, coordinate changes, and unnecessary RAM growth.
