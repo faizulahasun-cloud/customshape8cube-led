@@ -96,6 +96,8 @@
     let mathFrames = [];
     let bleWriteQueue = Promise.resolve();
     let webCubeMode = "NONE";
+    let webAnimationTimerLoop = null;
+    let webRenderFrameTrack = null;
      
     window.addEventListener("DOMContentLoaded", () => {
         const cachedMath = localStorage.getItem("cube_cached_math_expr");
@@ -288,7 +290,13 @@
 
         if(c === "A") webCubeMode = "A";
         else if(c === "M") webCubeMode = "M";
-        else if(c === "F") webCubeMode = "F";
+        else if(c === "F") {
+            webCubeMode = "F";
+            try {
+                clearInterval(webAnimationTimerLoop);
+                cancelAnimationFrame(webRenderFrameTrack);
+            } catch(e) {}
+        }
         else if(c === "Q") webCubeMode = "A";
 
         try{
@@ -339,6 +347,11 @@
             return;
         }
         try{
+            try {
+                clearInterval(webAnimationTimerLoop);
+                cancelAnimationFrame(webRenderFrameTrack);
+            } catch(e) {}
+
             const encoder = new TextEncoder();
             await queueBLEWrite(encoder.encode("C"));
             await new Promise(r => setTimeout(r, 50));
