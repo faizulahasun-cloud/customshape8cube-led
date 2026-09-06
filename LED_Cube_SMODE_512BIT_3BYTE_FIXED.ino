@@ -43,7 +43,7 @@ void triggerModeBlinkAcknowledgment(){
 
 // ---------------- SHARED EXPRESSION ENGINE ----------------
 // Math and Custom use the same local voxel-expression evaluator.
-// One program is active at a time. This is not a predefined shape list.
+// One program is active at a time. Custom is not tied to predefined shapes.
 enum MathOp : byte {
   M_END=0, M_CONST, M_X, M_Y, M_Z, M_F,
   M_ADD, M_SUB, M_MUL, M_DIV, M_MOD, M_NEG,
@@ -56,8 +56,9 @@ MathInstr mathProgram[96];
 byte mathProgramLength=0;
 bool mathProgramValid=false;
 
-// A single receive buffer is shared because only one function is loaded at a time.
-char rxBuffer[768];
+// One function at a time. This is a practical AVR source-buffer limit,
+// not a limit on what geometric shape can be described.
+char rxBuffer[640];
 byte rxLength=0;
 
 int mathPrecedence(byte op){
@@ -73,9 +74,9 @@ int mathPrecedence(byte op){
 bool mathRightAssociative(byte op){ return op==M_NEG || op==M_NOT; }
 
 bool mathEmit(byte op, float value=0.0f){
-  if(mathProgramLength >= 95) return false;
-  mathProgram[mathProgramLength].op = op;
-  mathProgram[mathProgramLength].value = value;
+  if(mathProgramLength>=95) return false;
+  mathProgram[mathProgramLength].op=op;
+  mathProgram[mathProgramLength].value=value;
   mathProgramLength++;
   return true;
 }
@@ -88,7 +89,6 @@ bool mathPopOperator(byte stack[], byte &top){
 bool compileExpression(const char *src){
   mathProgramLength=0;
   mathProgramValid=false;
-
   byte ops[96];
   byte top=0;
   bool expectValue=true;
@@ -98,6 +98,7 @@ bool compileExpression(const char *src){
     if(c==' ' || c=='\t'){ i++; continue; }
 
     if((c>='0' && c<='9') || c=='.'){
+      if(!expectValue) return false;
       char *endPtr;
       float value=strtod(src+i,&endPtr);
       if(endPtr==src+i || !mathEmit(M_CONST,value)) return false;
@@ -107,10 +108,11 @@ bool compileExpression(const char *src){
     }
 
     if((c>='A' && c<='Z') || (c>='a' && c<='z') || c=='_'){
+      if(!expectValue) return false;
       char name[20];
       byte n=0;
       while(((src[i]>='A' && src[i]<='Z') || (src[i]>='a' && src[i]<='z') ||
-            (src[i]>='0' && src[i]<='9') || src[i]=='_') && n<19){
+             (src[i]>='0' && src[i]<='9') || src[i]=='_') && n<19){
         name[n++]=src[i++];
       }
       name[n]='\0';
@@ -127,7 +129,6 @@ bool compileExpression(const char *src){
       else if(!strcmp(name,"sqrt")) fn=M_SQRT;
       else if(!strcmp(name,"abs")) fn=M_ABS;
       else return false;
-
       if(top>=95) return false;
       ops[top++]=fn;
       expectValue=true;
@@ -135,7 +136,7 @@ bool compileExpression(const char *src){
     }
 
     if(c=='('){
-      if(top>=95) return false;
+      if(!expectValue || top>=95) return false;
       ops[top++]=0xFF;
       i++;
       expectValue=true;
@@ -143,7 +144,8 @@ bool compileExpression(const char *src){
     }
 
     if(c==')'){
-      while(top && ops[top-1]!=0xFF){ if(!mathPopOperator(ops,top)) return false; }
+      if(expectValue) return false;
+      while(top && ops[top-1]!=0xFF) if(!mathPopOperator(ops,top)) return false;
       if(!top) return false;
       top--;
       if(top && (ops[top-1]==M_SIN || ops[top-1]==M_COS || ops[top-1]==M_SQRT || ops[top-1]==M_ABS)){
@@ -171,6 +173,8 @@ bool compileExpression(const char *src){
     else if(c=='%'){ op=M_MOD; }
     else return false;
 
+    if(expectValue && op!=M_NEG && op!=M_NOT) return false;
+
     while(top && ops[top-1]!=0xFF){
       byte previous=ops[top-1];
       bool popIt = (!mathRightAssociative(op) && mathPrecedence(op)<=mathPrecedence(previous)) ||
@@ -182,9 +186,9 @@ bool compileExpression(const char *src){
     if(top>=95) return false;
     ops[top++]=op;
     i+=tokenLen;
-    expectValue = (op==M_NEG || op==M_NOT || op==M_ADD || op==M_SUB || op==M_MUL ||
-                   op==M_DIV || op==M_MOD || op==M_LT || op==M_LE || op==M_GT || op==M_GE ||
-                   op==M_EQ || op==M_NE || op==M_AND || op==M_OR);
+    expectValue=(op==M_NEG || op==M_NOT || op==M_ADD || op==M_SUB || op==M_MUL ||
+                 op==M_DIV || op==M_MOD || op==M_LT || op==M_LE || op==M_GT || op==M_GE ||
+                 op==M_EQ || op==M_NE || op==M_AND || op==M_OR);
   }
 
   while(top){
@@ -192,7 +196,7 @@ bool compileExpression(const char *src){
     if(!mathPopOperator(ops,top)) return false;
   }
 
-  if(mathProgramLength==0) return false;
+  if(expectValue || mathProgramLength==0) return false;
   if(!mathEmit(M_END)) return false;
   mathProgramValid=true;
   return true;
@@ -200,7 +204,6 @@ bool compileExpression(const char *src){
 
 bool evaluateExpression(byte x, byte y, byte z, byte f){
   if(!mathProgramValid) return false;
-
   float stack[32];
   byte sp=0;
 
@@ -208,18 +211,12 @@ bool evaluateExpression(byte x, byte y, byte z, byte f){
     byte op=mathProgram[i].op;
     if(op==M_END) break;
 
-    if(op==M_CONST){
-      if(sp>=32) return false;
-      stack[sp++]=mathProgram[i].value;
-      continue;
-    }
-
+    if(op==M_CONST){ if(sp>=32) return false; stack[sp++]=mathProgram[i].value; continue; }
     if(op==M_X || op==M_Y || op==M_Z || op==M_F){
       if(sp>=32) return false;
       stack[sp++]=(op==M_X)?x:(op==M_Y)?y:(op==M_Z)?z:f;
       continue;
     }
-
     if(op==M_NEG || op==M_NOT || op==M_SIN || op==M_COS || op==M_SQRT || op==M_ABS){
       if(sp==0) return false;
       float a=stack[sp-1];
@@ -231,10 +228,8 @@ bool evaluateExpression(byte x, byte y, byte z, byte f){
       else stack[sp-1]=fabs(a);
       continue;
     }
-
     if(sp<2) return false;
     float b=stack[--sp], a=stack[sp-1];
-
     if(op==M_ADD) stack[sp-1]=a+b;
     else if(op==M_SUB) stack[sp-1]=a-b;
     else if(op==M_MUL) stack[sp-1]=a*b;
@@ -250,13 +245,12 @@ bool evaluateExpression(byte x, byte y, byte z, byte f){
     else if(op==M_OR) stack[sp-1]=(a!=0.0f || b!=0.0f);
     else return false;
   }
-
-  return sp>0 && stack[0]!=0.0f;
+  return sp==1 && stack[0]!=0.0f;
 }
 
 // ---------------- CUSTOM FUNCTION SOURCE ----------------
-// The custom source is parsed after the complete program has arrived.
-// Variables can be defined anywhere in the source and are expanded only then.
+// The entire custom function is received first, then compiled once. This
+// supports the legacy variable/IF/Z syntax and also RETURN/SHOW/VOXEL expr.
 bool customReady=false;
 
 String getBufferLine(unsigned int start, unsigned int end){
@@ -274,7 +268,6 @@ String getCustomVariableExpression(const String &name){
     while(pos<rxLength && rxBuffer[pos]!='\n') pos++;
     String line=getBufferLine(start,pos);
     if(pos<rxLength) pos++;
-
     int eq=line.indexOf('=');
     if(eq>0){
       String lhs=line.substring(0,eq);
@@ -291,34 +284,26 @@ String getCustomVariableExpression(const String &name){
 
 String expandCustomExpression(String expr, byte depth=0){
   if(depth>12) return String("__CYCLE__");
-
   String out="";
   for(unsigned int i=0;i<expr.length();){
     char c=expr[i];
-    if((c>='A'&&c<='Z') || (c>='a'&&c<='z') || c=='_'){
+    if((c>='A'&&c<='Z')||(c>='a'&&c<='z')||c=='_'){
       String name="";
       while(i<expr.length()){
         char q=expr[i];
-        if((q>='A'&&q<='Z') || (q>='a'&&q<='z') || (q>='0'&&q<='9') || q=='_'){
-          name += q;
-          i++;
-        }else break;
+        if((q>='A'&&q<='Z')||(q>='a'&&q<='z')||(q>='0'&&q<='9')||q=='_'){ name+=q; i++; }
+        else break;
       }
       name.toUpperCase();
-
-      if(name=="X" || name=="Y" || name=="Z" || name=="F" || name=="T" ||
-         name=="SIN" || name=="COS" || name=="SQRT" || name=="ABS"){
-        out += name;
-      }else{
+      if(name=="X"||name=="Y"||name=="Z"||name=="F"||name=="T"||
+         name=="SIN"||name=="COS"||name=="SQRT"||name=="ABS") out += name;
+      else{
         String rhs=getCustomVariableExpression(name);
-        if(rhs.length()) out += "(" + expandCustomExpression(rhs,depth+1) + ")";
+        if(rhs.length()) out += "("+expandCustomExpression(rhs,depth+1)+")";
         else out += name;
       }
-    }else{
-      out += c;
-      i++;
-    }
-    if(out.length()>=700) return String("__TOO_LONG__");
+    }else{ out += c; i++; }
+    if(out.length()>=580) return String("__TOO_LONG__");
   }
   return out;
 }
@@ -327,9 +312,7 @@ void appendCustomCondition(String &finalExpr, const String &condition){
   String expanded=expandCustomExpression(condition);
   if(expanded.indexOf("__CYCLE__")>=0 || expanded.indexOf("__TOO_LONG__")>=0) return;
   if(finalExpr.length()) finalExpr += "&&";
-  finalExpr += "(";
-  finalExpr += expanded;
-  finalExpr += ")";
+  finalExpr += "("+expanded+")";
 }
 
 bool compileCustomSource(){
@@ -343,62 +326,33 @@ bool compileCustomSource(){
     String line=getBufferLine(start,pos);
     if(pos<rxLength) pos++;
 
-    if(!line.length() || line=="CUSTOM" || line=="CF_BEGIN" ||
-       line=="START CUSTOM" || line=="END" || line=="CF_END") continue;
+    if(!line.length()||line=="CUSTOM"||line=="CF_BEGIN"||line=="START CUSTOM"||line=="END"||line=="CF_END") continue;
 
-    if(line.startsWith("RETURN ")){
-      finalExpr=expandCustomExpression(line.substring(7));
-      haveReturn=true;
-      break;
-    }
-    if(line.startsWith("SHOW ")){
-      finalExpr=expandCustomExpression(line.substring(5));
-      haveReturn=true;
-      break;
-    }
-    if(line.startsWith("VOXEL ")){
-      finalExpr=expandCustomExpression(line.substring(6));
-      haveReturn=true;
-      break;
-    }
+    if(line.startsWith("RETURN ")){ finalExpr=expandCustomExpression(line.substring(7)); haveReturn=true; break; }
+    if(line.startsWith("SHOW ")){ finalExpr=expandCustomExpression(line.substring(5)); haveReturn=true; break; }
+    if(line.startsWith("VOXEL ")){ finalExpr=expandCustomExpression(line.substring(6)); haveReturn=true; break; }
 
     if(line.startsWith("IF ")){
-      String condition=line.substring(3);
-      condition.trim();
-      if(condition.endsWith(" OFF")){
-        condition.remove(condition.length()-4);
-        condition.trim();
-        appendCustomCondition(finalExpr,"!("+condition+")");
-      }else if(condition.endsWith(" ON")){
-        condition.remove(condition.length()-3);
-        condition.trim();
-        appendCustomCondition(finalExpr,condition);
-      }else{
-        appendCustomCondition(finalExpr,condition);
-      }
+      String condition=line.substring(3); condition.trim();
+      if(condition.endsWith(" OFF")){ condition.remove(condition.length()-4); condition.trim(); appendCustomCondition(finalExpr,"!("+condition+")"); }
+      else if(condition.endsWith(" ON")){ condition.remove(condition.length()-3); condition.trim(); appendCustomCondition(finalExpr,condition); }
+      else appendCustomCondition(finalExpr,condition);
       continue;
     }
-
     if(line.startsWith("ON IF ")){ appendCustomCondition(finalExpr,line.substring(6)); continue; }
     if(line.startsWith("OFF IF ")){ appendCustomCondition(finalExpr,"!("+line.substring(7)+")"); continue; }
 
     int eq=line.indexOf('=');
     if(eq>0){
-      String lhs=line.substring(0,eq);
-      lhs.trim();
-
+      String lhs=line.substring(0,eq); lhs.trim();
       if(lhs=="Z"){
-        String rhs=line.substring(eq+1);
-        rhs.trim();
+        String rhs=line.substring(eq+1); rhs.trim();
         int orPos=rhs.indexOf(" OR ");
         if(orPos>=0){
-          String a=rhs.substring(0,orPos);
-          String b=rhs.substring(orPos+4);
+          String a=rhs.substring(0,orPos), b=rhs.substring(orPos+4);
           if(b.startsWith("Z=")) b=b.substring(2);
           appendCustomCondition(finalExpr,"(z==("+a+"))||((z==("+b+")))");
-        }else{
-          appendCustomCondition(finalExpr,"(z==("+rhs+"))");
-        }
+        }else appendCustomCondition(finalExpr,"(z==("+rhs+"))");
       }
       continue;
     }
@@ -408,36 +362,27 @@ bool compileCustomSource(){
 
   if(!haveReturn && !finalExpr.length()) return false;
   if(finalExpr.indexOf("__CYCLE__")>=0 || finalExpr.indexOf("__TOO_LONG__")>=0) return false;
-  if(finalExpr.length()>700) return false;
-  if(!compileExpression(finalExpr.c_str())) return false;
-
-  customReady=true;
-  return true;
+  if(finalExpr.length()>580) return false;
+  return compileExpression(finalExpr.c_str());
 }
 
-void resetCustomReceive(){
-  rxLength=0;
-  rxBuffer[0]='\0';
-  customReady=false;
-}
+void resetCustomReceive(){ rxLength=0; rxBuffer[0]='\0'; customReady=false; }
 
 void parseCustomFunctionStream(char c){
-  if(rxLength >= sizeof(rxBuffer)-1){
+  if(rxLength>=sizeof(rxBuffer)-1){
     customReady=false;
     parseMode=0;
     bluetooth.println(F("CUSTOM_ERROR"));
     return;
   }
-
   rxBuffer[rxLength++]=c;
   rxBuffer[rxLength]='\0';
 
-  if(rxLength>=7 &&
-     rxBuffer[rxLength-7]=='C' && rxBuffer[rxLength-6]=='F' &&
-     rxBuffer[rxLength-5]=='_' && rxBuffer[rxLength-4]=='E' &&
-     rxBuffer[rxLength-3]=='N' && rxBuffer[rxLength-2]=='D' &&
-     rxBuffer[rxLength-1]=='\n'){
+  if(rxLength>=7 && rxBuffer[rxLength-7]=='C' && rxBuffer[rxLength-6]=='F' &&
+     rxBuffer[rxLength-5]=='_' && rxBuffer[rxLength-4]=='E' && rxBuffer[rxLength-3]=='N' &&
+     rxBuffer[rxLength-2]=='D' && rxBuffer[rxLength-1]=='\n'){
     if(compileCustomSource()){
+      customReady=true;
       parseMode=0;
       bluetooth.println(F("CUSTOM_OK"));
     }else{
@@ -455,13 +400,10 @@ void drawExpressionFrame(byte f){
   byte localMatrix[8][8];
   for(byte z=0;z<8;z++){
     for(byte r=0;r<8;r++) localMatrix[z][r]=0;
-    for(byte y=0;y<8;y++){
-      for(byte x=0;x<8;x++){
-        if(evaluateExpression(x,y,z,f)){
-          byte c=columnIndex(x,y);
-          byte reg=COLUMN_MAP[c].reg, bit=COLUMN_MAP[c].bit;
-          if(reg>=1 && reg<=8 && bit<=7) localMatrix[z][reg-1] |= (1<<bit);
-        }
+    for(byte y=0;y<8;y++) for(byte x=0;x<8;x++){
+      if(evaluateExpression(x,y,z,f)){
+        byte c=columnIndex(x,y),reg=COLUMN_MAP[c].reg,bit=COLUMN_MAP[c].bit;
+        if(reg>=1&&reg<=8&&bit<=7) localMatrix[z][reg-1]|=(1<<bit);
       }
     }
   }
@@ -475,14 +417,13 @@ void drawCustomFunctionFrame(byte f){ drawExpressionFrame(f); }
 
 inline void shiftByteFast(byte value){
   for(int8_t bit=7;bit>=0;bit--){
-    if(value & (1<<bit)) PORTB |= _BV(PB3);
-    else PORTB &= ~_BV(PB3);
-    PORTB |= _BV(PB5);
-    PORTB &= ~_BV(PB5);
+    if(value&(1<<bit)) PORTB|=_BV(PB3);
+    else PORTB&=~_BV(PB3);
+    PORTB|=_BV(PB5);
+    PORTB&=~_BV(PB5);
   }
 }
-
-inline void latchFast(){ PORTB |= _BV(PB4); PORTB &= ~_BV(PB4); }
+inline void latchFast(){ PORTB|=_BV(PB4); PORTB&=~_BV(PB4); }
 
 void refreshDisplay(){
   static byte layer=0;
@@ -494,9 +435,7 @@ void refreshDisplay(){
   latchFast();
   layer=(layer+1)%8;
 }
-
 ISR(TIMER2_COMPA_vect){ refreshDisplay(); }
-
 void startRefreshTimer(){
   noInterrupts();
   TCCR2A=_BV(WGM21);
@@ -506,34 +445,34 @@ void startRefreshTimer(){
   interrupts();
 }
 
-inline bool isOuterRing(byte x,byte y){ return x==0 || x==7 || y==0 || y==7; }
-byte perimeterIndex(byte x,byte y){ if(y==0) return x; if(x==7) return 7+y; if(y==7) return 21-x; return 21+(7-y); }
+inline bool isOuterRing(byte x,byte y){ return x==0||x==7||y==0||y==7; }
+byte perimeterIndex(byte x,byte y){ if(y==0)return x; if(x==7)return 7+y; if(y==7)return 21-x; return 21+(7-y); }
 
 bool animationVoxel(byte a,byte f,byte x,byte y,byte z){
   if(a==0) return z==(f%8);
   if(a==1) return z==(7-(f%8));
   if(a==2) return x==(f%8);
   if(a==3) return y==(f%8);
-  if(a==4) return x==y && y==z && x==(f%8);
-  if(a==5) return x==y && z==(7-x) && x==(f%8);
+  if(a==4) return x==y&&y==z&&x==(f%8);
+  if(a==5) return x==y&&z==(7-x)&&x==(f%8);
   if(a==6) return ((x+y+z+f)&1)==0;
   if(a==7){ byte r=f%5; int d=max(abs((int)x-3),max(abs((int)y-3),abs((int)z-3))); return d==r; }
   if(a==8){ byte r=4-(f%5); int d=max(abs((int)x-3),max(abs((int)y-3),abs((int)z-3))); return d==r; }
   if(a==9){ if(!(x==3||x==4||y==3||y==4||z==3||z==4)) return false; return ((x+y+z+f)&1)==0; }
-  if(a==10){ byte w=(x+y+f)%8; return z==w || z==((w+1)%8); }
-  if(a==11){ byte s=(f/2)%8; if(s==0) return x==0; if(s==1) return y==7; if(s==2) return x==7; return y==0; }
-  if(a==12){ if(!isOuterRing(x,y)) return false; byte p=perimeterIndex(x,y); return ((p+f)%28)<3; }
-  if(a==13){ if(!isOuterRing(x,y)) return false; byte p=perimeterIndex(x,y); return z==((p+f)%8); }
-  if(a==14){ byte h=(x*3+y*5+f)%16; if(h>=8) return false; byte rz=7-h; return z==rz || (rz<7 && z==rz+1); }
-  if(a==15){ int dx=abs((int)x-3),dy=abs((int)y-3); if(dx<=1&&dy<=1){ if(z>((f/2)%8)) return false; return ((x+y+f)&1)!=0; } return false; }
-  if(a==16){ if(!isOuterRing(x,y)) return false; byte p=perimeterIndex(x,y),o=(p+f)%28; return z==(o%8)||z==((o+1)%8); }
-  if(a==17){ if(!isOuterRing(x,y)) return false; byte p=perimeterIndex(x,y); return z==((p+f)%8); }
+  if(a==10){ byte w=(x+y+f)%8; return z==w||z==((w+1)%8); }
+  if(a==11){ byte ss=(f/2)%8; if(ss==0)return x==0; if(ss==1)return y==7; if(ss==2)return x==7; return y==0; }
+  if(a==12){ if(!isOuterRing(x,y))return false; byte p=perimeterIndex(x,y); return ((p+f)%28)<3; }
+  if(a==13){ if(!isOuterRing(x,y))return false; byte p=perimeterIndex(x,y); return z==((p+f)%8); }
+  if(a==14){ byte h=(x*3+y*5+f)%16; if(h>=8)return false; byte rz=7-h; return z==rz||(rz<7&&z==rz+1); }
+  if(a==15){ int dx=abs((int)x-3),dy=abs((int)y-3); if(dx<=1&&dy<=1){ if(z>((f/2)%8))return false; return ((x+y+f)&1)!=0; } return false; }
+  if(a==16){ if(!isOuterRing(x,y))return false; byte p=perimeterIndex(x,y),o=(p+f)%28; return z==(o%8)||z==((o+1)%8); }
+  if(a==17){ if(!isOuterRing(x,y))return false; byte p=perimeterIndex(x,y); return z==((p+f)%8); }
   if(a==18){ byte r=f%8; int d=abs((int)x-3)+abs((int)y-3)+abs((int)z-3); return d==r||d==r+1; }
   if(a==19){ byte r=f%10; int d=min(abs((int)x-3),abs((int)x-4))+min(abs((int)y-3),abs((int)y-4))+min(abs((int)z-3),abs((int)z-4)); return d==r||d==r+1; }
   if(a==20){ byte r=9-(f%10); int d=min(abs((int)x-3),abs((int)x-4))+min(abs((int)y-3),abs((int)y-4))+min(abs((int)z-3),abs((int)z-4)); return d==r||d==r+1; }
   if(a==21){ int d=abs((int)x-3)+abs((int)y-3)+abs((int)z-3); return ((d+f)%4)<2; }
   if(a==22) return ((x+y+z+f)%8)==0;
-  if(a==23){ if(!((x==0||x==7)&&(y==0||y==7)&&(z==0||z==7))) return false; byte c=((z==7)?4:0)+((y==7)?2:0)+((x==7)?1:0); return c==(f%8); }
+  if(a==23){ if(!((x==0||x==7)&&(y==0||y==7)&&(z==0||z==7)))return false; byte c=((z==7)?4:0)+((y==7)?2:0)+((x==7)?1:0); return c==(f%8); }
   return false;
 }
 
@@ -541,12 +480,10 @@ void drawAnimationFrame(byte a,byte f){
   byte localMatrix[8][8];
   for(byte z=0;z<8;z++){
     for(byte r=0;r<8;r++) localMatrix[z][r]=0;
-    for(byte y=0;y<8;y++){
-      for(byte x=0;x<8;x++){
-        if(animationVoxel(a,f,x,y,z)){
-          byte c=columnIndex(x,y),reg=COLUMN_MAP[c].reg,bit=COLUMN_MAP[c].bit;
-          if(reg>=1&&reg<=8&&bit<=7) localMatrix[z][reg-1]|=(1<<bit);
-        }
+    for(byte y=0;y<8;y++) for(byte x=0;x<8;x++){
+      if(animationVoxel(a,f,x,y,z)){
+        byte c=columnIndex(x,y),reg=COLUMN_MAP[c].reg,bit=COLUMN_MAP[c].bit;
+        if(reg>=1&&reg<=8&&bit<=7) localMatrix[z][reg-1]|=(1<<bit);
       }
     }
   }
@@ -596,11 +533,10 @@ void loop(){
   static bool longPress=false;
   bool touch=digitalRead(TOUCH_PIN)==HIGH;
   if(lastBluetoothConnected) touch=false;
-
   if(touch&&!lastTouch){ touchTimer=now; longPress=false; }
   else if(touch&&lastTouch){
     unsigned long d=now-touchTimer;
-    if(!longPress && d>=3000UL){
+    if(!longPress&&d>=3000UL){
       currentCubeMode=(currentCubeMode==0)?1:0;
       triggerModeBlinkAcknowledgment();
       longPress=true;
@@ -610,7 +546,7 @@ void loop(){
   }
   else if(!touch&&lastTouch){
     unsigned long d=now-touchTimer;
-    if(!longPress && currentCubeMode==1 && d>=50 && d<3000UL){
+    if(!longPress&&currentCubeMode==1&&d>=50&&d<3000UL){
       animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;
       frameCounter=0;
       animationStart=now;
@@ -626,7 +562,7 @@ void loop(){
     if(parseMode==5){ parseCustomFunctionStream((char)in); continue; }
 
     if(parseMode==6){
-      if(in=='\n' || in=='\r'){
+      if(in=='\n'||in=='\r'){
         if(rxLength>0){
           rxBuffer[rxLength]='\0';
           if(compileExpression(rxBuffer)){
@@ -658,13 +594,13 @@ void loop(){
     }
 
     if(parseMode==0){
-      if(in=='A' || in==0x41 || in==0x51 || in=='Q'){
+      if(in=='A'||in==0x41||in==0x51||in=='Q'){
         currentCubeMode=0;
         animationStart=now;
         lastFrameTime=now;
         triggerModeBlinkAcknowledgment();
       }
-      else if(in=='M' || in==0x4D){
+      else if(in=='M'||in==0x4D){
         currentCubeMode=1;
         animationStart=now;
         lastFrameTime=now;
@@ -674,7 +610,7 @@ void loop(){
         parseMode=6;
         rxLength=0;
       }
-      else if(in=='F' || in==0x46){
+      else if(in=='F'||in==0x46){
         if(mathProgramValid){
           currentCubeMode=3;
           animationStart=now;
@@ -686,7 +622,7 @@ void loop(){
         parseMode=5;
         resetCustomReceive();
       }
-      else if(in=='X' || in==0x58){
+      else if(in=='X'||in==0x58){
         if(customReady){
           currentCubeMode=4;
           animationStart=now;
@@ -698,7 +634,7 @@ void loop(){
         bluetooth.println(F("CONNECTED"));
         triggerModeBlinkAcknowledgment();
       }
-      else if(in=='N' && currentCubeMode==1){
+      else if(in=='N'&&currentCubeMode==1){
         animationIndex=(animationIndex+1)%TOTAL_ANIMATIONS;
         frameCounter=0;
         lastFrameTime=now;
@@ -707,7 +643,7 @@ void loop(){
       else if(in=='B') parseMode=4;
     }
     else if(parseMode==4){
-      if(in>=2 && in<=8) globalBrightness=in;
+      if(in>=2&&in<=8) globalBrightness=in;
       parseMode=0;
     }
   }
