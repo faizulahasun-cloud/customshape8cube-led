@@ -112,3 +112,29 @@ This file is the permanent chronological record of code edits made to this proje
 - Reason: Version-control guidance must match the live Custom-only Logic Contract and must not cause future edits to restore or preserve a removed feature.
 - Contract/regression checks performed: Preserved the no-handshake rule, exact edit-log requirement, GitHub-source-of-truth rule, display/memory protections, and disconnect recovery requirements.
 - Commit SHA: `c841f99d37a0c2db759353cad856b85f20351ca5`.
+
+### 2026-09-07 — Separate Custom compile/preparation from Custom animation start
+
+- File: `LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino`
+- Change type: `FIX`
+- Before: `void resetCustomReceive(){rxLength=0;rxBuffer[0]='\0';customReady=false;customProgramValid=false;customProgramLength=0;}\nvoid parseCustomFunctionStream(char c){\n  if(rxLength>=sizeof(rxBuffer)-1){customReady=false;customProgramValid=false;parseMode=0;sendAck(F("CUSTOM_ERROR"));return;}` and on successful `CF_END`: `if(compileCustomSource()){customReady=true;parseMode=0;sendAck(F("CUSTOM_OK"));}` and the `C` branch: `else if(in=='C'){parseMode=5;resetCustomReceive();currentCubeMode=5;animationStart=now;lastFrameTime=now;clearDisplayBuffer();sendAck(F("CUSTOM_UPLOAD_READY"));}`
+- After: Added `void enterCustomWaitingState(){ currentCubeMode=5; animationStart=millis(); lastFrameTime=animationStart; frameCounter=0; clearDisplayBuffer(); }`; the Custom receive/error and successful compile paths explicitly call it; and the `C` command uses `resetCustomReceive();enterCustomWaitingState();`.
+- Reason: Custom source compilation is preparation/calculation only. Upload must stop the currently running built-in animation, blank the cube, compile/store the new program, and leave the Arduino in Custom Waiting. Only the separate `X` command may transition to `currentCubeMode=4` and begin `drawCustomFunctionFrame()` rendering.
+- Contract/regression checks performed: `C` and `CF_END` never enter Custom Mode; successful compilation does not render a frame; compile failure remains blank and waiting; `X` remains the only Custom-start transition; `S` still returns to Auto; built-in animation modes and common display refresh remain unchanged.
+- Commit SHA: `bfd7e4641b0c01105073ea25abac2efd11fecd47`.
+
+- File: `index.html`
+- Change type: `FIX`
+- Before: The Custom upload button text was `Send Function`, `sendCustomFunction()` cleared `customReady` and disabled `Start Custom`, then only notification `CUSTOM_OK` re-enabled `Start Custom`; `startCustomFunction()` began with `if(!customReady){alert("Custom function has not been successfully compiled yet.");return;}`.
+- After: The button text is `Send + Compile`; after the BLE upload completes successfully, the page enables `Start Custom` immediately and shows `CUSTOM FUNCTION SENT — WAITING FOR START`; `startCustomFunction()` no longer blocks on `customReady` or a `CUSTOM_OK` notification and simply sends `X` to Arduino. `CUSTOM_OK`/`CUSTOM_ERROR` notifications remain informational status updates.
+- Reason: The web UI must reflect the two distinct operations: Send + Compile prepares the program and leaves the cube blank/waiting, while Start Custom sends `X` and requests actual animation start. Arduino remains authoritative and rejects `X` with `CUSTOM_NOT_READY` when no valid compiled program exists.
+- Contract/regression checks performed: Preserved GATT UUIDs, BLE write queue/retry, 20-byte upload slicing, `C`/`CF_END`/`X`/`S`, no application-level handshake, and 3.5-second post-GATT control delay; no frame data are sent as Bluetooth control bytes.
+- Commit SHA: `cc5ffc7a7cd119a7dd32a965f7e1288f1e9887a3`.
+
+- File: `LOGIC_CONTRACT.md`
+- Change type: `BEHAVIOR CHANGE`
+- Before: `| Web Custom control | The web app sends the custom function to the Arduino. The Arduino stops the current animation, compiles/stores the new function, and waits for the Start Custom command before rendering it. Stopping Custom returns the cube to Auto Mode. |` and the existing Custom upload/start rows did not explicitly separate compile from animation start.
+- After: The Device Behavior row explicitly states `Send + Compile` stops/clears the cube, compiles/stores without rendering, and waits for `X`; a new `Custom upload / compile / start sequence` section defines the two operations separately; the Bluetooth Custom upload row explicitly says compilation does not start rendering.
+- Reason: The Custom-only architecture must explicitly preserve the distinction between calculating/compiling a function and running its animation, preventing future edits from accidentally making compile execute the renderer.
+- Contract/regression checks performed: Preserved Custom Waiting as blank, `X` as the only start transition, `S` as return-to-Auto, ACKs as status-only, and all existing physical/display/BLE requirements.
+- Commit SHA: `98886827d66a2226b16ee8e2c5dc52682de037d1`.
