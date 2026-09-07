@@ -52,3 +52,29 @@ This file is the permanent chronological record of code edits made to this proje
 
 - HTML check: `index.html` was inspected and not modified because its brightness transmission (`B` + one byte) already matches the contract, and it contains no Stream-mode implementation.
 - Commit SHA: recorded in the Git commit containing these changes.
+
+### 2026-09-07 — Add 3.5-second post-GATT web-control delay
+
+- File: `index.html`
+- Change type: `BEHAVIOR CHANGE`
+- Before: `setControlsEnabled(false);webCubeMode="NONE";customReady=false;document.getElementById("runCustomBtn").disabled=true;setControlsEnabled(true);`
+- After: `setControlsEnabled(false);webCubeMode="NONE";customReady=false;document.getElementById("runCustomBtn").disabled=true;setTimeout(()=>{setControlsEnabled(true);log.innerText="INTERFACE STATUS: CONNECTED";},3500);`
+- Reason: The Arduino uses a 3-second HM-10 STATE debounce before accepting Bluetooth control bytes after a connection. The web app now keeps its controls disabled for 3.5 seconds after successful GATT connection so normal controls are not exposed during that startup/debounce interval. No application-level handshake was added.
+- Contract/regression checks performed: Preserved direct command protocol with no application handshake; preserved `A`, `M`, `N`, Math, Custom, and `B` command formats; BLE disconnect handling remains unchanged; the delay applies only after successful web Bluetooth GATT connection.
+- Commit SHA: `0e8a4fca38ed0e5c991faad58336a89cdb8e8209`.
+
+- File: `LOGIC_CONTRACT.md`
+- Change type: `BEHAVIOR CHANGE`
+- Before: `| Bluetooth connection | The web app connects to the HM-10 and enables the controls after the GATT connection is established. No application-level handshake is required. |` and `| Connect | Establish the HM-10 GATT connection and enable the web controls. No application-level `H` handshake is required. |`
+- After: `| Bluetooth connection | The web app connects to the HM-10 through GATT, then keeps the web controls disabled for 3.5 seconds before enabling them. No application-level handshake is required. |` and `| Connect | Establish the HM-10 GATT connection, keep the web controls disabled for 3.5 seconds, then enable the controls. No application-level `H` handshake is required. |`
+- Reason: The web implementation now intentionally waits 3.5 seconds after GATT connection before exposing the Bluetooth controls. The contract is updated to describe the actual current web behavior while explicitly retaining the no-handshake requirement.
+- Contract/regression checks performed: No Arduino protocol command was added; no application handshake was introduced; brightness remains `B` plus one byte; Auto/Manual/Next/Math/Custom behavior remains unchanged.
+- Commit SHA: `00a9b5d675ce12f3035b6497f258ebcd56a4c810`.
+
+- File: `VERSION_CONTROL.md`
+- Change type: `BEHAVIOR CHANGE`
+- Before: `- Handshake uses `H` → `HANDSHAKE_OK`.` and `| Bluetooth | Connect, handshake, commands, notifications, disconnect fallback |` and `| ACKs | ACK is still produced, parsed, and waited for correctly |`
+- After: `- No application-level Bluetooth handshake is required.` and `| Bluetooth | Connect, commands, notifications, disconnect fallback |` and `| ACKs | ACK is still produced and parsed for status visibility; command execution does not depend on ACKs |`
+- Reason: The live Logic Contract defines no application-level handshake and explicitly states that ACKs do not gate command execution. The assistant-facing version-control rules were corrected so they cannot contradict the live specification by instructing future edits to implement or preserve an obsolete `H` handshake.
+- Contract/regression checks performed: Preserved the purpose of VERSION_CONTROL.md as editing protection; aligned its Bluetooth rules with the current Logic Contract; no Arduino or HTML behavior was changed by this documentation update.
+- Commit SHA: `f28cb9c747fbbfe3d35caf33f9364dd58e0fe08a`.
