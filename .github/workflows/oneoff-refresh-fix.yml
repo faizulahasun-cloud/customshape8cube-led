@@ -1,0 +1,40 @@
+name: One-off 8x8x8 refresh blanking fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/oneoff-refresh-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-refresh-order:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch refresh sequence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino')
+          s = p.read_text()
+          old = 'void refreshDisplay(){static byte layer=0;brightnessAccumulator[layer]+=globalBrightness;bool en=brightnessAccumulator[layer]>=8;if(en)brightnessAccumulator[layer]-=8;shiftByteFast(en?(1<<layer):0);for(int8_t r=7;r>=0;r--)shiftByteFast(displayBuffer[layer][r]);latchFast();layer=(layer+1)%8;}'
+          new = 'void refreshDisplay(){static byte layer=0;shiftByteFast(0);for(int8_t r=7;r>=0;r--)shiftByteFast(0);latchFast();brightnessAccumulator[layer]+=globalBrightness;bool en=brightnessAccumulator[layer]>=8;if(en)brightnessAccumulator[layer]-=8;shiftByteFast(en?(1<<layer):0);for(int8_t r=7;r>=0;r--)shiftByteFast(displayBuffer[layer][r]);latchFast();layer=(layer+1)%8;}'
+
+          if old not in s:
+              raise SystemExit('Target refreshDisplay implementation not found; refusing to modify the file.')
+
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: Commit refresh fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino
+          git diff --cached --quiet || git commit -m 'Fix 8x8x8 refresh layer blanking order'
+          git push
