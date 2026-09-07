@@ -8,9 +8,11 @@ This file protects the project's important logic from being lost during future e
 |---|---|---|
 | `LOGIC_CONTRACT.md` | Current required behavior | Update only when the intended project behavior changes |
 | `VERSION_CONTROL.md` | Rules for protecting the logic | Do not remove these rules casually |
+| `CODE_CHANGE_LOG.md` | Permanent edit history | Append only; preserve every historical entry |
 
 `LOGIC_CONTRACT.md` is the live specification.
 `VERSION_CONTROL.md` explains how to edit code without losing that specification.
+`CODE_CHANGE_LOG.md` is the permanent record of every code edit and its exact Before → After → Reason.
 
 ## 2. Never silently change behavior
 
@@ -50,7 +52,8 @@ Before editing `index.html` or the Arduino `.ino`:
 4. Modify only the necessary code.
 5. Check that unrelated functions and protocols are still present.
 6. Re-check every item in the Future Change Checklist in `LOGIC_CONTRACT.md`.
-7. Commit with a clear description of what changed.
+7. Append the exact Before → After → Reason entry to `CODE_CHANGE_LOG.md` in the same change.
+8. Commit with a clear description of what changed.
 
 ## 5. Do not use an old file as the source of truth
 
@@ -125,6 +128,22 @@ If a future edit removes an existing function, variable, command, fallback, or p
 
 Do not delete something only because it looks unused without checking `LOGIC_CONTRACT.md` and the whole code path first.
 
+## 11. Permanent code-change log protection
+
+`CODE_CHANGE_LOG.md` is append-only historical evidence.
+
+For every edit to `LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino` or `index.html`:
+
+- Append an entry to `CODE_CHANGE_LOG.md` in the same commit.
+- Record the exact Before text.
+- Record the exact After text.
+- Record the reason for the replacement.
+- Record the contract/regression checks performed.
+- Never delete, rewrite, reorder, or silently alter prior entries.
+- The assistant must not delete the log file or historical entries. Deletion is reserved for the repository owner/user.
+
+Analysis/check/report without modification does not create a code-change entry.
+
 ## Golden rule
 
-**Current GitHub code + `LOGIC_CONTRACT.md` are the source of truth. Git history is the backup history. Never reconstruct the project from memory when the repository can be inspected.**
+**Current GitHub code + `LOGIC_CONTRACT.md` are the source of truth. `CODE_CHANGE_LOG.md` is the permanent exact edit history. Git history is the backup history. Never reconstruct the project from memory when the repository can be inspected.**
