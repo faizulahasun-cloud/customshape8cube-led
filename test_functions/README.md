@@ -1,6 +1,6 @@
 # 8×8×8 Cube Function Test Library
 
-These files are copy/paste test cases for the browser Custom Function editor 
+These files are copy/paste test cases for the browser Custom Function editor.
 
 ## Custom Function engine
 
@@ -32,10 +32,10 @@ The only limits are practical AVR resources (program/source size and helper-vari
 - `custom/08_rotating_heart_mid_axis.txt` — heart rotating around the cube's center Z axis
 - `custom/09_rotating_anchor_mid_axis.txt` — anchor rotating around the cube's center Y axis
 
-
-
 ## Test method
-1. Copy one file into the corresponding web editor.
-2. For Custom, press **Send Function** and wait for **CUSTOM FUNCTION READY**.
-3. Press **Start Custom**.
-4. Only the selected function runs; functions are not queued or combined.
+1. Copy one file into the **Custom Function** editor in `index.html`.
+2. Press **Send + Compile**. This sends `C`, the source, and `CF_END`; Arduino stops the current animation, clears the cube, compiles/stores the function, and remains blank in Custom Waiting.
+3. **Do not expect compilation to start the animation.** `CUSTOM_OK` / `CUSTOM_ERROR` are status acknowledgements only.
+4. After the function has been sent, press **Start Custom**. This sends `X`; only then does Arduino begin Custom frame generation.
+5. To stop Custom, press **Stop Custom**. Arduino returns to Auto Mode.
+6. Only the selected function runs; functions are not queued or combined.
