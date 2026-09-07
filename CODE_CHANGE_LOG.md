@@ -78,3 +78,37 @@ This file is the permanent chronological record of code edits made to this proje
 - Reason: The live Logic Contract defines no application-level handshake and explicitly states that ACKs do not gate command execution. The assistant-facing version-control rules were corrected so they cannot contradict the live specification by instructing future edits to implement or preserve an obsolete `H` handshake.
 - Contract/regression checks performed: Preserved the purpose of VERSION_CONTROL.md as editing protection; aligned its Bluetooth rules with the current Logic Contract; no Arduino or HTML behavior was changed by this documentation update.
 - Commit SHA: `f28cb9c747fbbfe3d35caf33f9364dd58e0fe08a`.
+
+### 2026-09-07 — Remove Math feature and keep Custom function only
+
+- File: `LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino`
+- Change type: `BEHAVIOR CHANGE`
+- Before: The live firmware contained the Math protocol comment `// H=handshake, A=auto, M=manual, N=next animation, Y=begin math upload, F=start math, C=begin custom upload, X=start custom, S=stop custom, B=brightness + one byte value.`, Math program state (`MathOp`, `MathInstr`, `mathProgram`, `mathProgramLength`, `mathProgramValid`), Math compiler/evaluator entry points (`compileExpression`, `evaluateExpression`), Math rendering (`drawMathFrame`), the Math parser branch `parseMode==6`, and the `Y`/`F` command branches.
+- After: The protocol comment is `// A=auto, M=manual, N=next animation, C=begin custom upload, X=start custom,` followed by `// S=stop custom, B=brightness + one byte value.`; the compiler/evaluator used by Custom is retained under Custom-specific names (`ExprOp`, `ExprInstr`, `customProgram`, `compileCustomExpression`, `evaluateCustomExpression`); all Math command parsing, Math modes, Math rendering, and Math-only state were removed.
+- Reason: The project is now Custom-function-only. Removing the Math feature eliminates its UI/protocol/mode surface while preserving the expression engine required by the Custom function implementation.
+- Contract/regression checks performed: Preserved 27 built-in animations including rotating heart index 26; preserved Auto/Manual/touch behavior; preserved Custom `C` upload, `CF_END`, `X` start, `S` stop, `B` brightness; preserved HM-10 pins and 3-second Arduino disconnect debounce; preserved common display buffer and flicker-safe 72-bit refresh; removed `Y` and `F` as Bluetooth commands; no application-level handshake added.
+- Commit SHA: `3c77de81a4dfc6ed31f91b8ce669c869e8b76981`.
+
+- File: `index.html`
+- Change type: `BEHAVIOR CHANGE`
+- Before: The page contained the Math button `<button class="btn btn-warning modeControl" ... onclick="transmitModeToken('F')" ...>Math Mode ('F')</button>`, the Mathematical Function Engine editor/preview panel, the `mathFrames` state, `compileMathFunction()`, Math notification handlers, and `sendMathFunction()`/`F` handling in `transmitModeToken()`.
+- After: The page contains only Auto, Manual, Next Animation, Custom Function, and brightness controls; all Math UI, Math preview state, Math notification handlers, Math upload/start code, and `F` command handling are removed. The existing 3.5-second post-GATT control delay remains unchanged.
+- Reason: The web app must expose only the Custom-function workflow after Math removal.
+- Contract/regression checks performed: Preserved GATT service/characteristic, serialized BLE writes and transient write-busy retry, text-stream notification handling, Custom `C`/`CF_END`/`X`/`S`, direct `A`/`M`/`N`, and `B` + one-byte brightness protocol; no application-level handshake or ACK dependency added.
+- Commit SHA: `fe6672397eff4dc7c72435e4bae2ac20ff63e735`.
+
+- File: `LOGIC_CONTRACT.md`
+- Change type: `BEHAVIOR CHANGE`
+- Before: The Device Behavior, Modes, Bluetooth actions, and display/memory sections explicitly listed Math upload, Start Math, Math waiting state, Math Mode, Math rendering, and Math program memory.
+- After: The current contract contains only Auto, Manual, Custom waiting/Custom Mode, and their corresponding Bluetooth actions; rendering and memory sections now describe Built-in + Custom only.
+- Reason: The live specification must describe the current Custom-only product behavior and must not require a removed Math feature.
+- Contract/regression checks performed: Preserved all physical wiring, touch, brightness, BLE disconnect fallback, coordinate/front-face, rotating-heart, display-buffer, flicker-safe multiplexing, no-handshake, and RAM-saving rules.
+- Commit SHA: `294c8eb0e490cf72d20af9ebee733855f024be31`.
+
+- File: `VERSION_CONTROL.md`
+- Change type: `BEHAVIOR CHANGE`
+- Before: Protected-behavior and regression examples referred to Math alongside Custom, including `Built-in, Math, and Custom rendering` and `Auto, Manual, Math, Custom`.
+- After: Those references now describe `Built-in and Custom` rendering and `Auto, Manual, Custom` modes, with no Math feature in the protected current behavior.
+- Reason: Version-control guidance must match the live Custom-only Logic Contract and must not cause future edits to restore or preserve a removed feature.
+- Contract/regression checks performed: Preserved the no-handshake rule, exact edit-log requirement, GitHub-source-of-truth rule, display/memory protections, and disconnect recovery requirements.
+- Commit SHA: `c841f99d37a0c2db759353cad856b85f20351ca5`.
