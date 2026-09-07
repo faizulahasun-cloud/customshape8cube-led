@@ -1,7 +1,8 @@
 CUSTOM
-A=(F%16)/2
+T=F%16
+A=(T-(T%2))/2
 B=7-A
-IF X!=A OFF
-IF Y!=B OFF
+S=(X==A&&Y==B)||(X==B&&Y==A)
+IF !S OFF
 Z=F%8
 END
