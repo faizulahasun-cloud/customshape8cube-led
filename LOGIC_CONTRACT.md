@@ -18,7 +18,7 @@ The device behavior has priority. The Arduino code, physical wiring, Bluetooth H
 | Bluetooth is disconnected | After the configured disconnect detection/debounce period, the cube independently returns to built-in Auto Mode. The web app does not need to send an Auto command. |
 | Brightness control with Bluetooth disconnected | The physical potentiometer controls the cube brightness. |
 | Brightness control with Bluetooth connected | The web app brightness control sets the cube brightness. |
-| Bluetooth connection | The web app connects to the HM-10 and enables the controls after the GATT connection is established. No application-level handshake is required. |
+| Bluetooth connection | The web app connects to the HM-10 through GATT, then keeps the web controls disabled for 3.5 seconds before enabling them. No application-level handshake is required. |
 | Web Auto control | The cube switches to built-in Auto Mode. |
 | Web Manual control | The cube switches to Manual Mode and keeps the current animation. |
 | Web Next Animation control | The cube advances to the next built-in animation. |
@@ -72,7 +72,7 @@ The web app and Arduino communicate through direct command messages. Arduino ack
 
 | Web action | Command / behavior |
 |---|---|
-| Connect | Establish the HM-10 GATT connection and enable the web controls. No application-level `H` handshake is required. |
+| Connect | Establish the HM-10 GATT connection, keep the web controls disabled for 3.5 seconds, then enable the controls. No application-level `H` handshake is required. |
 | Auto | Send `A`; Arduino selects Auto Mode. |
 | Manual | Send `M`; Arduino selects Manual Mode and keeps the current animation. |
 | Next | Send `N`; Arduino advances the animation when in Manual Mode. |
