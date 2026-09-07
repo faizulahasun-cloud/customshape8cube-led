@@ -1,6 +1,6 @@
 # 8×8×8 Cube Function Test Library
 
-These files are copy/paste test cases for the browser Custom Function editor and Math Function editor.
+These files are copy/paste test cases for the browser Custom Function editor 
 
 ## Custom Function engine
 
@@ -32,12 +32,7 @@ The only limits are practical AVR resources (program/source size and helper-vari
 - `custom/08_rotating_heart_mid_axis.txt` — heart rotating around the cube's center Z axis
 - `custom/09_rotating_anchor_mid_axis.txt` — anchor rotating around the cube's center Y axis
 
-## Mathematical function files
-- `math/01_diagonal_wave.txt` — binary diagonal wave
-- `math/02_sphere.txt` — animated sphere
-- `math/03_checker_wave.txt` — animated checker wave
-- `math/04_rotating_plane.txt` — moving plane
-- `math/05_nested_wave.txt` — combined sine/cosine field
+
 
 ## Test method
 1. Copy one file into the corresponding web editor.
