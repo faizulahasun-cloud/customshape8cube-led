@@ -15,16 +15,21 @@ The device behavior has priority. The Arduino code, physical wiring, Bluetooth H
 | User holds touchpad for more than 3 seconds | The cube switches between Auto Mode and Manual Mode. The currently selected animation is kept when changing mode. |
 | User gives a single short touch | While in Manual Mode, the cube advances to the next built-in animation. A short touch does not switch modes by itself. |
 | User touches while Bluetooth is connected | Physical touch control is ignored while the web app is connected and controlling the cube. |
-| Bluetooth is disconnected | After the configured disconnect detection/debounce period, the cube independently returns to built-in Auto Mode. The web app does not need to send an Auto command. |
+| Bluetooth is disconnected | After the configured disconnect detection/debounce period, the cube independently returns to built-in Auto Mode. The web app does not need to send an Auto command. Any previously compiled Custom program may remain stored in RAM, but it is not displayed while Auto Mode is running. |
 | Brightness control with Bluetooth disconnected | The physical potentiometer controls the cube brightness. |
 | Brightness control with Bluetooth connected | The web app brightness control sets the cube brightness. |
 | Bluetooth connection | The web app connects to the HM-10 through GATT, then keeps the web controls disabled for 3.5 seconds before enabling them. No application-level handshake is required. |
 | Web Auto control | The cube switches to built-in Auto Mode. |
 | Web Manual control | The cube switches to Manual Mode and keeps the current animation. |
 | Web Next Animation control | The cube advances to the next built-in animation. |
-| Web Custom control | The Send + Compile action first stops the current animation and clears the cube. The Arduino compiles/calculates and stores the Custom program but does not render it. The cube stays blank in Custom Waiting until the separate Start Custom action sends `X`. Stopping Custom returns the cube to Auto Mode. |
+| Enter Custom workflow | The cube immediately stops the previous animation and becomes completely blank before any Custom source is uploaded. |
+| Custom compile in web app | The browser validates/compiles the entered Custom function locally. This operation sends **no Custom source or compile data to the Arduino**. A failed compile is kept entirely in the web app. |
+| Custom upload after successful compile | Only a successfully compiled Custom function may be sent to the Arduino. Upload begins with `C`, which keeps the cube blank in Custom Waiting while the source is transferred. |
+| Custom upload completion | After the successfully precompiled source is uploaded, the web app sends `X` so the Arduino starts the Custom animation. There is no intermediate built-in animation. |
+| Arduino-side Custom validation | The Arduino may still validate/compile the received source before accepting it. If that validation fails, it stays completely blank in Custom Waiting and does not run the invalid program. |
+| Stopping Custom | `S` stops Custom and returns to built-in Auto Mode. |
 | Function editor on page load | The Custom editor starts empty. The web app does not preload a previously saved function. |
-| Function persistence | The web app does not use previously saved Custom source as an automatic input. A function becomes active only after the user explicitly enters and sends it; the Arduino keeps only the currently compiled Custom program in RAM. |
+| Function persistence | The web app does not use previously saved Custom source as an automatic input. A function becomes active only after the user explicitly compiles successfully and uploads it; the Arduino may keep the currently compiled Custom program in RAM. |
 | Front face | The physical front face is the reference face for left-to-right X position and for anything described as being seen from the front. |
 | Rotating heart | The heart is a normal built-in animation and must appear on the physical front face using the same built-in animation system as the other built-in animations. |
 
@@ -59,18 +64,19 @@ These physical connections are part of the device behavior and must not be casua
 |---|---|
 | Auto Mode | Built-in animations run automatically and move to the next animation on the normal carousel timing. |
 | Manual Mode | The selected built-in animation continues running until the user or web app selects the next animation. |
-| Custom waiting state | The current animation is stopped and the cube remains blank while waiting for a valid uploaded Custom program and the Start Custom command. |
+| Custom waiting state | The current animation is stopped and the cube remains completely blank while waiting for a valid uploaded Custom program and the Start Custom command. |
 | Custom Mode | After a valid Custom program exists and Start Custom (`X`) is received, the Arduino evaluates the function and displays the result on the cube. |
 | Return to Auto | Bluetooth disconnect or stopping Custom returns the cube to built-in Auto Mode. |
 
 ### Custom upload / compile / start sequence
 
-The Custom workflow has two separate operations and they must never be merged:
+The Custom workflow has three separate stages and they must not be merged:
 
-1. **Send + Compile** sends `C`, which immediately enters the Custom Waiting state and clears the display. The uploaded source is then parsed/compiled into the stored Custom program. Compilation/calculation only prepares the program; it does **not** call the Custom frame renderer and does **not** start animation.
-2. After the source has been sent, **Start Custom** sends `X`. Only `X` is allowed to transition the Arduino from Custom Waiting to Custom Mode and begin frame generation.
-3. A compile failure leaves the cube blank in Custom Waiting with no Custom animation running.
-4. `CUSTOM_OK` and `CUSTOM_ERROR` are status acknowledgements only. The actual start decision is made by the Arduino when it receives `X`.
+1. **Compile in the web app.** The user edits the Custom function and presses Compile. The browser validates/compiles it locally. If compilation fails, **nothing is sent to Arduino**.
+2. **Upload after successful compile.** When the local compile succeeds, the user presses Upload & Start Custom. The browser first sends `C`, which immediately stops any running animation and blanks the cube, then transfers the source followed by `CF_END`.
+3. **Start only after upload.** After the upload completes, the web app sends `X`. The Arduino can only enter Custom Mode after it has accepted a valid compiled Custom program. No built-in animation may run between Custom selection, upload, and Custom start.
+4. The Arduino may independently reject malformed or unsupported source. `CUSTOM_ERROR` leaves the cube blank in Custom Waiting.
+5. `CUSTOM_OK` and `CUSTOM_ERROR` are status acknowledgements only. Normal web command flow does not wait for ACKs or use protocol timeouts.
 
 ## 4. Bluetooth / web app behavior
 
@@ -82,8 +88,8 @@ The web app and Arduino communicate through direct command messages. Arduino ack
 | Auto | Send `A`; Arduino selects Auto Mode. |
 | Manual | Send `M`; Arduino selects Manual Mode and keeps the current animation. |
 | Next | Send `N`; Arduino advances the animation when in Manual Mode. |
-| Custom upload | Send `C`, then send the custom source followed by `CF_END`. `C` stops the current animation and blanks the cube; the Arduino compiles/stores the program and remains in Custom Waiting. Compilation does not start rendering. |
-| Start Custom | Send `X`; Arduino starts Custom Mode only when a valid custom program exists. |
+| Compile Custom | Validate/compile the Custom function locally in the web app. Do not send Custom source to Arduino when compilation fails. |
+| Upload & Start Custom | Only enabled after a successful local compile. Send `C`, then the source followed by `CF_END`, then `X`. `C` stops the current animation and blanks the cube; `X` is the only Arduino transition into Custom Mode. |
 | Stop Custom | Send `S`; Arduino stops Custom Mode and returns to Auto Mode. |
 | Brightness | Send `B` followed by one brightness byte. |
 

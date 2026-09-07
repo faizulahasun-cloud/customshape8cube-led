@@ -14,7 +14,7 @@ This file is the permanent chronological record of code edits made to this proje
    - **Reason:** why the replacement was necessary
    - Contract/regression checks performed
    - Commit SHA
-3. Do not summarize the Before/After text when recording a code edit. Record the exact replaced text and the exact replacement text.
+3. Do not summarize the Before/After text when recording the code edit. Record the exact replaced text and the exact replacement text.
 4. Do not delete, rewrite, reorder, or silently alter old log entries.
 5. New entries are append-only and must go at the end of the file.
 6. An existing log entry is historical evidence and must never be treated as disposable project content.
@@ -185,3 +185,50 @@ unsigned int rxLength=0;`
 - File: `README.md`
 - Change type: `DOCUMENTATION`
 - Reason: The README still described removed Heart/Cross-only Custom behavior and claimed Safari/iOS support that is not provided by native Web Bluetooth. The current page instead uses a general Custom Function editor, and native Safari/iOS Web Bluetooth remains unsupported.
+
+### 2026-09-07 — Implement local Custom compile gate and Upload → Start workflow
+
+- File: `LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino`
+- Change type: `FIX`
+- Before: `if(!lastBluetoothConnected){currentCubeMode=0;parseMode=0;rxLength=0;customProgramValid=false;customReady=false;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();}`
+- After: `if(!lastBluetoothConnected){currentCubeMode=0;parseMode=0;rxLength=0;animationStart=now;lastFrameTime=now;triggerModeBlinkAcknowledgment();}`
+- Reason: Bluetooth disconnect must return the physical cube to built-in Auto Mode without erasing the already compiled Custom program held in RAM. The compiled Custom program is retained but is not displayed while Auto Mode runs.
+- Contract/regression checks performed: Disconnect still uses the existing 3-second debounce; Auto timing restarts immediately; physical touch/brightness behavior remains unchanged; Custom `C` still clears/replaces the stored Custom program when a new upload begins; no new protocol command was introduced.
+
+- File: `index.html`
+- Change type: `BEHAVIOR CHANGE`
+- Before: `<div class="control-group"><button id="sendCustomBtn" class="btn btn-primary bleControl" style="background:#475569" onclick="sendCustomFunction()" disabled>Send + Compile</button><button class="btn btn-success" id="runCustomBtn" onclick="startCustomFunction()" disabled>Start Custom</button></div>`
+- After: `<div class="control-group"><button id="compileCustomBtn" class="btn btn-warning bleControl" onclick="compileCustomFunction()" disabled>Compile Custom</button><button class="btn btn-success bleControl" id="uploadCustomBtn" onclick="uploadAndStartCustomFunction()" disabled>Upload &amp; Start</button></div>`
+- Reason: Compilation is now a browser-only preparation step. The Arduino must receive no Custom source when the local compile fails. A successful compile unlocks the upload action, and upload then sends the Custom source and automatically sends `X` to start the animation.
+- Contract/regression checks performed: Editor starts empty; no saved source is preloaded; the existing 3.5-second post-GATT disable remains; Auto/Manual/Next and brightness controls remain direct commands; BLE writes remain serialized and packet-sliced.
+
+- File: `index.html`
+- Change type: `FIX`
+- Before: `async function sendCustomFunction(){if(!targetDataCharacteristic){alert("Bluetooth is not connected.");return;}if(commandBusy)return;const code=document.getElementById("customFuncIDE").value.trim();if(!code){alert("Custom function is empty.");return;}commandBusy=true;localStorage.removeItem("cube_cached_custom_func");const log=document.getElementById("connectionLog");customReady=false;document.getElementById("runCustomBtn").disabled=true;log.innerText="SENDING CUSTOM FUNCTION — CUBE WILL CLEAR AND WAIT...";log.className="status-panel";try{const enc=new TextEncoder();await queueBLEWrite(enc.encode("C"));const payload=code+"\nCF_END\n";for(let i=0;i<payload.length;i+=20){await queueBLEWrite(enc.encode(payload.slice(i,i+20)));await new Promise(r=>setTimeout(r,20));}customReady=true;document.getElementById("runCustomBtn").disabled=false;log.innerText="CUSTOM FUNCTION SENT — WAITING FOR START";log.className="status-panel status-connected";}catch(e){customReady=false;document.getElementById("runCustomBtn").disabled=true;log.innerText="FUNCTION SEND ERROR: "+e.message;log.className="status-panel status-disconnected";console.error(e);}finally{commandBusy=false;}}`
+- After: `async function compileCustomFunction(){if(commandBusy)return;const code=document.getElementById("customFuncIDE").value.trim();if(!code){alert("Custom function is empty.");return;}const result=localCompileCustomSource(code);const log=document.getElementById("connectionLog");if(!result.ok){localCompileOk=false;compiledCustomSource="";document.getElementById("uploadCustomBtn").disabled=true;log.innerText="CUSTOM COMPILE FAILED — NOTHING SENT TO ARDUINO";log.className="status-panel status-disconnected";alert(result.error);return;}localCompileOk=true;compiledCustomSource=code;document.getElementById("uploadCustomBtn").disabled=false;log.innerText="CUSTOM COMPILE OK — READY TO UPLOAD";log.className="status-panel status-connected";}`
+- Reason: The old Send + Compile operation transmitted source to Arduino before any browser-side compile result existed. The replacement performs a local compile/validation first and stores the exact successfully compiled source. No Bluetooth write occurs on compile failure.
+- Contract/regression checks performed: A changed textarea invalidates the previous compile; upload requires the current source to exactly match the successfully compiled source; no ACK or timeout is required for normal command execution.
+
+- File: `index.html`
+- Change type: `FIX`
+- Before: `async function startCustomFunction(){if(!targetDataCharacteristic){alert("Bluetooth is not connected.");return;}if(commandBusy)return;commandBusy=true;try{await queueBLEWrite(new TextEncoder().encode("X"));webCubeMode="CUSTOM";document.getElementById("stopCustomBtn").disabled=false;document.getElementById("connectionLog").innerText="CUSTOM START COMMAND SENT";}catch(e){const log=document.getElementById("connectionLog");log.innerText="CUSTOM START ERROR: "+e.message;log.className="status-panel status-disconnected";console.error(e);}finally{commandBusy=false;}}`
+- After: `async function uploadAndStartCustomFunction(){if(!targetDataCharacteristic||!physicalTargetDevice?.gatt?.connected){alert("Bluetooth is not connected.");return;}if(!localCompileOk||document.getElementById("customFuncIDE").value.trim()!==compiledCustomSource){alert("Compile the current Custom function successfully before uploading.");return;}if(commandBusy)return;commandBusy=true;const log=document.getElementById("connectionLog");customReady=false;webCubeMode="NONE";document.getElementById("uploadCustomBtn").disabled=true;document.getElementById("stopCustomBtn").disabled=true;log.innerText="ENTERING CUSTOM WAITING — CUBE BLANK";log.className="status-panel";try{const enc=new TextEncoder();await queueBLEWrite(enc.encode("C"));const payload=compiledCustomSource+"\nCF_END\n";for(let i=0;i<payload.length;i+=20){await queueBLEWrite(enc.encode(payload.slice(i,i+20)));await new Promise(r=>setTimeout(r,20));}await queueBLEWrite(enc.encode("X"));webCubeMode="CUSTOM";document.getElementById("stopCustomBtn").disabled=false;log.innerText="CUSTOM START COMMAND SENT";log.className="status-panel status-connected";}catch(e){customReady=false;webCubeMode="NONE";document.getElementById("uploadCustomBtn").disabled=!localCompileOk;document.getElementById("stopCustomBtn").disabled=true;log.innerText="CUSTOM UPLOAD ERROR — CUBE REMAINS BLANK";log.className="status-panel status-disconnected";console.error(e);}finally{commandBusy=false;}}`
+- Reason: Upload now has a strict successful-local-compile gate, enters Custom Waiting with a blank cube by sending `C`, transfers the compiled source, and then sends `X` automatically. There is no separate Start Custom action after upload.
+- Contract/regression checks performed: `C` remains the blanking command; the Arduino still accepts `X` only when a valid compiled Custom program exists; `CUSTOM_OK`/`CUSTOM_ERROR` remain informational; `S` still returns Auto.
+
+### 2026-09-07 — Preserve compiled Custom program across BLE disconnect
+
+- File: `LOGIC_CONTRACT.md`
+- Change type: `BEHAVIOR CHANGE`
+- Before: `| Bluetooth is disconnected | After the configured disconnect detection/debounce period, the cube independently returns to built-in Auto Mode. The web app does not need to send an Auto command. |` and the Custom workflow did not define browser-local compilation before upload.
+- After: The Bluetooth disconnect row additionally states that a previously compiled Custom program may remain stored in RAM while Auto runs; Custom workflow rows define browser-local compile first, no Arduino upload on failure, successful upload only, and automatic `X` start after upload.
+- Reason: The live contract is updated to exactly match the requested device behavior: disconnect resumes built-in Auto without destroying the stored Custom program, while Custom source is compiled in the web app before transmission.
+- Contract/regression checks performed: Preserved the 3-second disconnect debounce, no-handshake rule, ACK-as-status rule, blank Custom Waiting state, `C`/`CF_END`/`X`/`S` command roles, and common display pipeline.
+
+- File: `CODE_CHANGE_LOG.md`
+- Change type: `DOCUMENTATION`
+- Before: This project change had not yet been recorded in the append-only log.
+- After: This entry records the exact firmware disconnect edit and the exact HTML Custom workflow edits above.
+- Reason: Repository protection requires every Arduino/HTML edit and any Logic Contract change to be recorded in the same history.
+- Contract/regression checks performed: Verified that the logged edits correspond to the committed tree changes and that the old log entries remain unchanged.
+- Commit SHA: recorded in the Git commit containing these changes.
