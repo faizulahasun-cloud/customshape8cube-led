@@ -2,22 +2,21 @@ name: Temporary Consistency Fix
 
 on:
   push:
-    branches: [temp-consistency-fix]
+    branches:
+      - temp-consistency-fix
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: startsWith(github.event.head_commit.message, 'TEMP: apply requested consistency fixes')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch firmware, contract, and change log
-        shell: python
+      - name: Patch files
         run: |
+          python3 <<'PY'
           from pathlib import Path
-          from datetime import datetime
 
           ino = Path('LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino')
           md = Path('LOGIC_CONTRACT.md')
@@ -41,13 +40,12 @@ jobs:
           ino.write_text(ino_text, encoding='utf-8')
           md.write_text(md_text, encoding='utf-8')
 
-          entry = f'''\n### 2026-09-07 — Fix brightness protocol and remove stale Stream-mode requirement\n\n- File: `LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino`\n- Change type: `FIX`\n- Before: `{before_ino}`\n- After: `{after_ino}`\n- Reason: The web app already sends `B` followed by one brightness byte, but the firmware only changed `parseMode` to 4 and had no handler to consume the following byte. The added handler consumes that byte, clamps it to the supported 2–8 range, resets the parser, and acknowledges the update.\n- Contract/regression checks performed: Preserved `B` command entry point; preserved all existing Auto/Manual/Math/Custom command branches; protocol byte is consumed as control data rather than LED frame data.\n\n- File: `LOGIC_CONTRACT.md`\n- Change type: `BEHAVIOR CHANGE`\n- Before: `{before_md}`\n- After: `{after_md}`\n- Reason: The current firmware has no Stream-mode parser, buffer, command, or rendering path. The previous Stream-mode rule therefore described functionality that does not exist in the current protocol and created a documentation/code inconsistency. The contract is corrected to describe the actual current buffered display implementation rather than inventing a stream feature.\n- Contract/regression checks performed: Built-in, Math, and Custom common display-buffer pipeline remains the documented path; flicker-safe multiplexing row remains unchanged; no command definitions were added or removed.\n\n- HTML check: `index.html` was inspected and not modified because its brightness transmission (`B` + one byte) already matches the contract, and it contains no Stream-mode implementation to reconcile.\n- Commit SHA: recorded by Git in the commit containing these changes.\n'''
+          entry = f'''\n### 2026-09-07 — Fix brightness protocol and reconcile Stream-mode contract\n\n- File: `LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino`\n- Change type: `FIX`\n- Before: `{before_ino}`\n- After: `{after_ino}`\n- Reason: The web app already sends `B` followed by one brightness byte, but the firmware only changed `parseMode` to 4 and had no handler to consume the following byte. The added handler consumes that byte, clamps it to the supported 2–8 range, resets the parser, and acknowledges the update.\n- Contract/regression checks performed: Preserved the existing `B` command entry point and all Auto/Manual/Math/Custom command branches; the brightness byte is consumed as control data and is not treated as LED frame data.\n\n- File: `LOGIC_CONTRACT.md`\n- Change type: `BEHAVIOR CHANGE`\n- Before: `{before_md}`\n- After: `{after_md}`\n- Reason: The current firmware has no Stream-mode parser, buffer, command, or rendering path. The previous Stream-mode rule therefore described functionality that does not exist in the current protocol and created a documentation/code inconsistency. The contract is corrected to describe the actual current buffered display implementation.\n- Contract/regression checks performed: Built-in, Math, and Custom common display-buffer pipeline remains documented; the flicker-safe multiplexing rule is unchanged; no command definitions were added or removed.\n\n- HTML check: `index.html` was inspected and not modified because its brightness transmission (`B` + one byte) already matches the contract, and it contains no Stream-mode implementation.\n- Commit SHA: recorded in the Git commit containing these changes.\n'''
 
           log_text = log.read_text(encoding='utf-8')
           log.write_text(log_text.rstrip() + '\n' + entry, encoding='utf-8')
-
-      - name: Commit and remove temporary workflow
-        shell: bash
+          PY
+      - name: Commit changes and remove runner
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
