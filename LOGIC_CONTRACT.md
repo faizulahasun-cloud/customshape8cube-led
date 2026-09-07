@@ -22,7 +22,7 @@ The device behavior has priority. The Arduino code, physical wiring, Bluetooth H
 | Web Auto control | The cube switches to built-in Auto Mode. |
 | Web Manual control | The cube switches to Manual Mode and keeps the current animation. |
 | Web Next Animation control | The cube advances to the next built-in animation. |
-| Web Custom control | The web app sends the custom function to the Arduino. The Arduino stops the current animation, compiles/stores the new function, and waits for the Start Custom command before rendering it. Stopping Custom returns the cube to Auto Mode. |
+| Web Custom control | The Send + Compile action first stops the current animation and clears the cube. The Arduino compiles/calculates and stores the Custom program but does not render it. The cube stays blank in Custom Waiting until the separate Start Custom action sends `X`. Stopping Custom returns the cube to Auto Mode. |
 | Function editor on page load | The Custom editor starts empty. The web app does not preload a previously saved function. |
 | Function persistence | The web app does not use previously saved Custom source as an automatic input. A function becomes active only after the user explicitly enters and sends it; the Arduino keeps only the currently compiled Custom program in RAM. |
 | Front face | The physical front face is the reference face for left-to-right X position and for anything described as being seen from the front. |
@@ -63,6 +63,15 @@ These physical connections are part of the device behavior and must not be casua
 | Custom Mode | After a valid Custom program exists and Start Custom (`X`) is received, the Arduino evaluates the function and displays the result on the cube. |
 | Return to Auto | Bluetooth disconnect or stopping Custom returns the cube to built-in Auto Mode. |
 
+### Custom upload / compile / start sequence
+
+The Custom workflow has two separate operations and they must never be merged:
+
+1. **Send + Compile** sends `C`, which immediately enters the Custom Waiting state and clears the display. The uploaded source is then parsed/compiled into the stored Custom program. Compilation/calculation only prepares the program; it does **not** call the Custom frame renderer and does **not** start animation.
+2. After the source has been sent, **Start Custom** sends `X`. Only `X` is allowed to transition the Arduino from Custom Waiting to Custom Mode and begin frame generation.
+3. A compile failure leaves the cube blank in Custom Waiting with no Custom animation running.
+4. `CUSTOM_OK` and `CUSTOM_ERROR` are status acknowledgements only. The actual start decision is made by the Arduino when it receives `X`.
+
 ## 4. Bluetooth / web app behavior
 
 The web app and Arduino communicate through direct command messages. Arduino acknowledgements may be sent for status/reporting, but the web app does not block command execution waiting for them and has no protocol timeout/failure path based on missing ACKs.
@@ -73,7 +82,7 @@ The web app and Arduino communicate through direct command messages. Arduino ack
 | Auto | Send `A`; Arduino selects Auto Mode. |
 | Manual | Send `M`; Arduino selects Manual Mode and keeps the current animation. |
 | Next | Send `N`; Arduino advances the animation when in Manual Mode. |
-| Custom upload | Send `C`, then send the custom source followed by `CF_END`. Arduino stops the current animation and compiles/stores the new program, remaining in the Custom waiting state. |
+| Custom upload | Send `C`, then send the custom source followed by `CF_END`. `C` stops the current animation and blanks the cube; the Arduino compiles/stores the program and remains in Custom Waiting. Compilation does not start rendering. |
 | Start Custom | Send `X`; Arduino starts Custom Mode only when a valid custom program exists. |
 | Stop Custom | Send `S`; Arduino stops Custom Mode and returns to Auto Mode. |
 | Brightness | Send `B` followed by one brightness byte. |
@@ -129,5 +138,3 @@ When working on this project:
 ## Golden rule
 
 **The code must serve the device behavior, not redefine it accidentally.**
-
-When a code change is proposed, verify that the physical cube still behaves exactly as described in the Device Behavior table unless the user intentionally requested a behavior change.
