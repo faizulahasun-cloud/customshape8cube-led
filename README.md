@@ -10,7 +10,7 @@ A web-based BLE (Bluetooth Low Energy) interface for controlling an 8x8x8 LED cu
 
 - **Bluetooth Connectivity**: Pair with HM-10 BLE module
 - **Auto/Manual Modes**: Switch between automatic and manual control
-- **Custom Shapes**: Send 3D Heart and Cross patterns to the LED cube
+- **Custom Functions**: Upload user-defined 3D voxel functions to the LED cube
 - **Brightness Control**: Adjust LED brightness with slider (levels 2-8)
 - **Real-time Status**: Visual feedback on connection state
 
@@ -21,16 +21,16 @@ A web-based BLE (Bluetooth Low Energy) interface for controlling an 8x8x8 LED cu
 3. Use the control buttons to send commands:
    - **Auto Mode** - Automatic pattern cycling
    - **Manual Mode** - Manual control
-   - **Next Pattern Step** - Progress to next pattern
-   - **Custom Shapes** - Send Heart or Cross 3D patterns
+   - **Next Animation** - Advance to the next built-in animation in Manual Mode
+   - **Custom Functions** - Enter and upload a supported custom voxel function
    - **Brightness Slider** - Adjust LED brightness
 
 ## Browser Support
 
 - ✅ Chrome/Chromium (Windows, macOS, Linux, Android)
-- ✅ Edge (Windows, macOS)
-- ✅ Safari (macOS, iOS)
-- ✅ Opera
+- ✅ Edge (Windows, macOS, Android)
+- ✅ Opera (desktop and supported Android versions)
+- ❌ Safari/iOS Safari: native Web Bluetooth is not supported
 
 ## License
 

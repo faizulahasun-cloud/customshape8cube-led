@@ -76,7 +76,7 @@ ExprInstr customProgram[96];
 byte customProgramLength=0;
 bool customProgramValid=false;
 char rxBuffer[512];
-byte rxLength=0;
+unsigned int rxLength=0;
 
 inline uint32_t exprFloatBits(float value){ union { float f; uint32_t u; } v; v.f=value; return v.u; }
 inline float exprBitsFloat(uint32_t value){ union { float f; uint32_t u; } v; v.u=value; return v.f; }

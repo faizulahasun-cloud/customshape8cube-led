@@ -158,3 +158,30 @@ This file is the permanent chronological record of code edits made to this proje
 - Reason: The three Auto/Manual/Next buttons invoked `transmitModeToken(...)`, but the current HTML contained no definition for that function. The buttons therefore failed at runtime with an undefined-function error. The handler now serializes `A`, `M`, or `N` through the existing BLE write queue without introducing an ACK dependency or protocol timeout.
 - Contract/regression checks performed: Preserved the existing `A`, `M`, `N`, `C`, `CF_END`, `X`, `S`, and `B` protocol; preserved the unconditional 3.5-second post-GATT control delay; preserved notification parsing and BLE write retry behavior; no Math UI or handshake was restored.
 - Commit SHA: `d3073aa62b79c138dc121a42672257bf93450545`.
+
+
+### 2026-09-07 — Fix Custom receive-length overflow
+
+- File: `LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino`
+- Change type: `FIX`
+- Before: `char rxBuffer[512];
+byte rxLength=0;`
+- After: `char rxBuffer[512];
+unsigned int rxLength=0;`
+- Reason: `rxBuffer` is 512 bytes but `rxLength` was an 8-bit `byte`, wrapping at 255 bytes. Larger Custom uploads could therefore corrupt the receive buffer instead of using the existing 511-byte bounds check. The counter is widened to `unsigned int`.
+- Contract/regression checks performed: Preserved the Custom `C`/`CF_END` protocol, compile/start separation, all built-in animations, display refresh, touch, brightness, BLE behavior, and pin assignments.
+
+### 2026-09-07 — Fix Custom error-state UI synchronization
+
+- File: `index.html`
+- Change type: `FIX`
+- Before: `else if(cleanData==="CUSTOM_NOT_READY"){customReady=false;document.getElementById("runCustomBtn").disabled=true;log.innerText="CUSTOM FUNCTION NOT READY";log.className="status-panel status-disconnected";}`
+- After: `else if(cleanData==="CUSTOM_NOT_READY"){customReady=false;webCubeMode="NONE";document.getElementById("runCustomBtn").disabled=true;document.getElementById("stopCustomBtn").disabled=true;log.innerText="CUSTOM FUNCTION NOT READY";log.className="status-panel status-disconnected";}`
+- Reason: `CUSTOM_NOT_READY` previously disabled Start Custom but could leave the browser's local Custom mode and Stop button stale. The UI now returns to `NONE` and disables Stop Custom when Arduino reports that no valid Custom program exists.
+- Contract/regression checks performed: No command format changed; ACKs remain status-only; `X` remains the Arduino start request; BLE write queue, 20-byte upload slicing, 3.5-second connection delay, and Auto/Manual/Next behavior preserved.
+
+### 2026-09-07 — Refresh README for current Custom-only Web Bluetooth implementation
+
+- File: `README.md`
+- Change type: `DOCUMENTATION`
+- Reason: The README still described removed Heart/Cross-only Custom behavior and claimed Safari/iOS support that is not provided by native Web Bluetooth. The current page instead uses a general Custom Function editor, and native Safari/iOS Web Bluetooth remains unsupported.
