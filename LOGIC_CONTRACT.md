@@ -103,6 +103,8 @@ The web app and Arduino communicate through direct command messages. Arduino ack
 | Protocol bytes | Bluetooth control commands are control messages only; they are never treated as LED frame data. |
 | Waiting states | Math and Custom waiting states must blank/hold the display instead of continuing the previous animation. |
 | Rotating heart | Uses the same built-in animation pipeline as the other built-in animations. |
+| Flicker-safe multiplexing | For the 8×8×8 cube, every refresh slot must turn all layer outputs OFF before shifting the 72-bit display data and latching it, then enable only the selected layer. This prevents the previous layer from remaining active while new column data are shifted. |
+| Stream-mode multiplexing | Stream/display modes must follow the same layer-OFF → shift 72 bits → latch → layer-ON electrical sequence; the stream path must not bypass blanking when changing shift-register data. |
 
 ## 7. Memory behavior
 
