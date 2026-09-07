@@ -21,8 +21,7 @@ A code edit must not remove, weaken, rename, or bypass an existing behavior just
 Examples of protected behavior:
 
 - Bluetooth disconnect returns Arduino to built-in Auto Mode.
-- Handshake uses `H` → `HANDSHAKE_OK`.
-- ACK waiter is created before sending a command.
+- No application-level Bluetooth handshake is required.
 - Protocol bytes are not LED frame bytes.
 - Built-in, Math, and Custom rendering use the same display pipeline.
 - Front face remains `y=0`.
@@ -110,10 +109,10 @@ After modifying either major code file, check at minimum:
 
 | Area | Verify |
 |---|---|
-| Bluetooth | Connect, handshake, commands, notifications, disconnect fallback |
+| Bluetooth | Connect, commands, notifications, disconnect fallback |
 | Modes | Auto, Manual, Math, Custom |
 | Commands | Every command still has its intended meaning |
-| ACKs | ACK is still produced, parsed, and waited for correctly |
+| ACKs | ACK is still produced and parsed for status visibility; command execution does not depend on ACKs |
 | Display | Shift registers still receive only display data |
 | Coordinates | X/Y/Z contract unchanged unless intentionally changed |
 | Animations | Existing animations remain functions and still render |
