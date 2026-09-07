@@ -277,7 +277,7 @@ void drawCustomFunctionFrame(byte f){drawExpressionFrame(f);}
 
 inline void shiftByteFast(byte value){for(int8_t bit=7;bit>=0;bit--){if(value&(1<<bit))PORTB|=_BV(PB3);else PORTB&=~_BV(PB3);PORTB|=_BV(PB5);PORTB&=~_BV(PB5);}}
 inline void latchFast(){PORTB|=_BV(PB4);PORTB&=~_BV(PB4);}
-void refreshDisplay(){static byte layer=0;allLayersOff();brightnessAccumulator[layer]+=globalBrightness;bool en=brightnessAccumulator[layer]>=8;if(en)brightnessAccumulator[layer]-=8;shiftByteFast(en?(1<<layer):0);for(int8_t r=7;r>=0;r--)shiftByteFast(displayBuffer[layer][r]);latchFast();layer=(layer+1)%8;}
+void refreshDisplay(){static byte layer=0;shiftByteFast(0);for(int8_t r=7;r>=0;r--)shiftByteFast(0);latchFast();brightnessAccumulator[layer]+=globalBrightness;bool en=brightnessAccumulator[layer]>=8;if(en)brightnessAccumulator[layer]-=8;shiftByteFast(en?(1<<layer):0);for(int8_t r=7;r>=0;r--)shiftByteFast(displayBuffer[layer][r]);latchFast();layer=(layer+1)%8;}
 ISR(TIMER2_COMPA_vect){refreshDisplay();}
 void startRefreshTimer(){noInterrupts();TCCR2A=_BV(WGM21);TCCR2B=_BV(CS22)|_BV(CS21)|_BV(CS20);OCR2A=3;TIMSK2|=_BV(OCIE2A);interrupts();}
 inline bool isOuterRing(byte x,byte y){return x==0||x==7||y==0||y==7;}
