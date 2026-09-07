@@ -18,12 +18,14 @@ The device behavior has priority. The Arduino code, physical wiring, Bluetooth H
 | Bluetooth is disconnected | After the configured disconnect detection/debounce period, the cube independently returns to built-in Auto Mode. The web app does not need to send an Auto command. |
 | Brightness control with Bluetooth disconnected | The physical potentiometer controls the cube brightness. |
 | Brightness control with Bluetooth connected | The web app brightness control sets the cube brightness. |
-| Bluetooth connection | The web app connects to the HM-10, completes the connection handshake, and then enables the available controls. |
+| Bluetooth connection | The web app connects to the HM-10 and enables the controls after the GATT connection is established. No application-level handshake is required. |
 | Web Auto control | The cube switches to built-in Auto Mode. |
 | Web Manual control | The cube switches to Manual Mode and keeps the current animation. |
 | Web Next Animation control | The cube advances to the next built-in animation. |
-| Web Math control | The web app sends the math expression to the Arduino, then the Arduino renders that expression on the cube. |
-| Web Custom control | The web app sends the custom function to the Arduino, then the Arduino renders that function on the cube. Stopping Custom returns the cube to Auto Mode. |
+| Web Math control | The web app sends the math expression to the Arduino. The Arduino stops the current animation, compiles/stores the new expression, and waits for the Start Math command before rendering it. |
+| Web Custom control | The web app sends the custom function to the Arduino. The Arduino stops the current animation, compiles/stores the new function, and waits for the Start Custom command before rendering it. Stopping Custom returns the cube to Auto Mode. |
+| Function editor on page load | Math and Custom editors start empty. The web app does not preload a previously saved function. |
+| Function persistence | The web app does not use previously saved Math/Custom source as an automatic input. A function becomes active only after the user explicitly enters and sends it; the Arduino keeps only the currently compiled program in RAM. |
 | Front face | The physical front face is the reference face for left-to-right X position and for anything described as being seen from the front. |
 | Rotating heart | The heart is a normal built-in animation and must appear on the physical front face using the same built-in animation system as the other animations. |
 
@@ -58,37 +60,37 @@ These physical connections are part of the device behavior and must not be casua
 |---|---|
 | Auto Mode | Built-in animations run automatically and move to the next animation on the normal carousel timing. |
 | Manual Mode | The selected built-in animation continues running until the user or web app selects the next animation. |
-| Math Mode | The Arduino evaluates the uploaded math expression and displays the result on the cube. |
-| Custom Mode | The Arduino evaluates the uploaded custom function and displays the result on the cube. |
+| Math waiting state | The current animation is stopped and the cube remains blank while waiting for a valid uploaded math program and the Start Math command. |
+| Math Mode | After a valid math program exists and Start Math (`F`) is received, the Arduino evaluates the expression and displays the result on the cube. |
+| Custom waiting state | The current animation is stopped and the cube remains blank while waiting for a valid uploaded custom program and the Start Custom command. |
+| Custom Mode | After a valid custom program exists and Start Custom (`X`) is received, the Arduino evaluates the function and displays the result on the cube. |
 | Return to Auto | Bluetooth disconnect or stopping Custom returns the cube to built-in Auto Mode. |
 
 ## 4. Bluetooth / web app behavior
 
-The web app and Arduino communicate through the HM-10 using command messages and acknowledgements.
+The web app and Arduino communicate through direct command messages. Arduino acknowledgements may be sent for status/reporting, but the web app does not block command execution waiting for them and has no protocol timeout/failure path based on missing ACKs.
 
-| Web action | Arduino response / behavior |
+| Web action | Command / behavior |
 |---|---|
-| Connect | Establish HM-10 connection and complete handshake before normal controls are enabled. |
-| Handshake | Web app sends `H`; Arduino replies `HANDSHAKE_OK`. |
-| Auto | `A` selects Auto Mode and Arduino confirms with `MODE_AUTO`. |
-| Manual | `M` selects Manual Mode and Arduino confirms with `MODE_MANUAL`. |
-| Next | `N` advances the animation when used in Manual Mode and Arduino confirms with `ANIMATION_NEXT`. |
-| Math upload | Web app starts the upload channel, sends the expression, and waits for the Arduino result. |
-| Start Math | `F` starts Math Mode after a valid math program exists. |
-| Custom upload | Web app starts the upload channel, sends the custom function, and waits for the Arduino result. |
-| Start Custom | `X` starts Custom Mode after a valid custom function exists. |
-| Stop Custom | `S` stops Custom Mode and returns the cube to Auto Mode. |
-| Brightness | `B` followed by the brightness value sets the Arduino brightness while connected. |
+| Connect | Establish the HM-10 GATT connection and enable the web controls. No application-level `H` handshake is required. |
+| Auto | Send `A`; Arduino selects Auto Mode. |
+| Manual | Send `M`; Arduino selects Manual Mode and keeps the current animation. |
+| Next | Send `N`; Arduino advances the animation when in Manual Mode. |
+| Math upload | Send `Y`, then send the math expression followed by a newline. Arduino stops the current animation and compiles/stores the new program, remaining in the Math waiting state. |
+| Start Math | Send `F`; Arduino starts Math Mode only when a valid math program exists. |
+| Custom upload | Send `C`, then send the custom source followed by `CF_END`. Arduino stops the current animation and compiles/stores the new program, remaining in the Custom waiting state. |
+| Start Custom | Send `X`; Arduino starts Custom Mode only when a valid custom program exists. |
+| Stop Custom | Send `S`; Arduino stops Custom Mode and returns to Auto Mode. |
+| Brightness | Send `B` followed by one brightness byte. |
 
 ## 5. Bluetooth reliability rules
 
 | Rule | Required behavior |
 |---|---|
-| Handshake timing | Notifications are enabled before the first handshake is sent. |
-| Handshake reliability | A missed first response must not cause an unnecessary connection failure; handshake retry is supported. |
+| Application handshake | No application-level connection handshake or handshake timeout is required. |
 | BLE writes | Transient Bluetooth write-busy conditions may be retried. |
 | Incoming data | Notifications are treated as a text stream so a message split across packets is still handled correctly. |
-| ACK ordering | For a command expecting an acknowledgement, the web app prepares the acknowledgement waiter before sending the command. |
+| ACKs | ACK messages may still be emitted by Arduino for status visibility, but web command execution must not depend on receiving them and must never show a protocol timeout. |
 
 ## 6. Frame, coordinate, and display behavior
 
@@ -99,6 +101,7 @@ The web app and Arduino communicate through the HM-10 using command messages and
 | Animation generation | Built-in, Math, and Custom animations produce cube frame data through the common display system. |
 | Display buffer | Animation logic updates the display buffer; the refresh system handles sending display data to the 74HC595 chain. |
 | Protocol bytes | Bluetooth control commands are control messages only; they are never treated as LED frame data. |
+| Waiting states | Math and Custom waiting states must blank/hold the display instead of continuing the previous animation. |
 | Rotating heart | Uses the same built-in animation pipeline as the other built-in animations. |
 
 ## 7. Memory behavior
