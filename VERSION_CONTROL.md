@@ -76,10 +76,8 @@ For an important logic change:
 
 Examples of useful commit messages:
 
-- `Fix HM-10 handshake reliability`
-- `Fix rotating heart front-face orientation`
 - `Reduce Arduino SRAM usage`
-- `Change disconnect fallback behavior`
+- refresh rate
 
 ## 7. Logic document versioning
 
