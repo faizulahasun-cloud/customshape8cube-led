@@ -54,6 +54,14 @@ inline bool generateFrame(uint8_t frameIndex) {
   return true;
 }
 
+// Start the current compiled function immediately from animation frame F=0.
+// This is the entry point the runtime controller uses after a new function
+// has been successfully compiled.
+inline bool start() {
+  reset();
+  return generateFrame(0);
+}
+
 // Generate the next animation frame using the same compiled function.
 inline bool generateNextFrame() {
   bool ok = generateFrame(currentFrame);
