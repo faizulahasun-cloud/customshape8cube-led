@@ -5,6 +5,7 @@
 - LED001 is the bottom-layer LED at Column 1.
 - Columns 1–8 are the FRONT face.
 - Numbering proceeds through the physical cube from this starting point.
+- LED number= Z*64 + Y*8+ X+ 1
 - V2 keeps each physical LED as an individual definition in `LEDs/`.
 - Frame files combine LED definitions; `+` means visual OR/combination, not arithmetic addition.
 - Animation files sequence frames.
