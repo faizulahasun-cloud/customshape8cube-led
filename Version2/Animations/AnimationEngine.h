@@ -2,70 +2,68 @@
 
 #include <Arduino.h>
 #include "../FunctionConversion/FunctionConversionEngine.h"
-#include "../Multiplexing/DisplayEngine.h"
+#include "../Frames/FrameEngine.h"
 
 // V2 Animation Engine
 // -------------------
-// Converts the complete function received by the Function Conversion Engine
-// into frame data for the V2 frame/display pipeline.
+// Takes the complete compiled function from the Function Conversion Engine,
+// evaluates it for all 512 voxels for the current F, and converts the result
+// into the compatible 64-byte frame data required by the Frame Engine.
 //
-// The function itself is NOT hard-coded into this engine. The compiled
-// function is evaluated for every voxel at the current animation frame F.
-// Each completed evaluation pass produces one 512-voxel frame.
+// Frame data format:
+//   byte = Z*8 + Y
+//   bit  = X
+//   64 bytes = 512 voxels
 //
-// Coordinates: X=0..7, Y=0..7, Z=0..7.
-// Frame index F starts at 0 and advances once per generated frame.
-//
-// This engine does not perform physical LED mapping, shift-register control,
-// brightness control, or Bluetooth communication.
+// The function is NOT hard-coded here. F changes from frame to frame so the
+// same received function generates the complete animation.
 
 namespace V2Animation {
 
 static const uint8_t TOTAL_FRAMES = 50;
-
-// Current animation frame number.
 static uint8_t currentFrame = 0;
 
-// Generate one frame directly from the compiled function.
-// The resulting 512 ON/OFF voxel values are handed to the V2 display/frame
-// pipeline through DisplayEngine::buildFrame().
-inline bool generateFrame(uint8_t frameIndex) {
-    if (!V2FunctionConversion::isFunctionValid()) return false;
-
-    const V2FunctionConversion::Instruction *program =
-        V2FunctionConversion::compiledFunction();
-    const uint8_t programLength = V2FunctionConversion::compiledLength();
-
-    // Keep the function representation owned by FunctionConversionEngine;
-    // Animation Engine only supplies X,Y,Z,F and converts the result into
-    // frame voxel data.
-    V2Display::buildFrame(
-        [program, programLength, frameIndex](uint8_t X, uint8_t Y, uint8_t Z) -> bool {
-            (void)programLength;
-            return V2FunctionConversion::evaluateProgram(program, X, Y, Z, frameIndex);
-        }
-    );
-
-    currentFrame = frameIndex;
-    return true;
+// Frame callback used by the Function Conversion Engine evaluator.
+inline bool evaluateCurrentVoxel(uint8_t X, uint8_t Y, uint8_t Z) {
+  return V2FunctionConversion::evaluate(X, Y, Z, currentFrame);
 }
 
-// Generate the next frame and wrap after the current 50-frame animation.
-inline bool generateNextFrame() {
-    if (!V2FunctionConversion::isFunctionValid()) return false;
+// Convert the current function at a specific F into one compatible frame.
+inline bool generateFrame(uint8_t frameIndex) {
+  if (!V2FunctionConversion::isFunctionValid()) return false;
 
-    bool ok = generateFrame(currentFrame);
-    currentFrame++;
-    if (currentFrame >= TOTAL_FRAMES) currentFrame = 0;
-    return ok;
+  currentFrame = frameIndex % TOTAL_FRAMES;
+  V2FrameEngine::clear();
+
+  for (uint8_t Z = 0; Z < 8; Z++) {
+    for (uint8_t Y = 0; Y < 8; Y++) {
+      for (uint8_t X = 0; X < 8; X++) {
+        if (evaluateCurrentVoxel(X, Y, Z)) {
+          V2FrameEngine::setVoxel(X, Y, Z, true);
+        }
+      }
+    }
+  }
+
+  // The Frame Engine now owns a complete 64-byte compatible frame.
+  V2FrameEngine::submit();
+  return true;
+}
+
+// Generate the next animation frame. The same received function is reused;
+// only F advances.
+inline bool generateNextFrame() {
+  bool ok = generateFrame(currentFrame);
+  currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
+  return ok;
 }
 
 inline void reset() {
-    currentFrame = 0;
+  currentFrame = 0;
 }
 
 inline uint8_t frameIndex() {
-    return currentFrame;
+  return currentFrame;
 }
 
 } // namespace V2Animation
