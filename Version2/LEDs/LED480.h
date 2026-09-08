@@ -1,0 +1,7 @@
+#pragma once
+// Physical LED 480
+// Layer 7, Column 8, depth row 4
+// Cube coordinate: X=7, Y=3, Z=6
+#define LED480_X 7
+#define LED480_Y 3
+#define LED480_Z 6
