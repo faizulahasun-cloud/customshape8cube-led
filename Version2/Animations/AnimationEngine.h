@@ -6,29 +6,29 @@
 
 // V2 Animation Engine
 // -------------------
-// Takes the complete compiled function from the Function Conversion Engine,
-// evaluates it for all 512 voxels for the current F, and converts the result
-// into the compatible 64-byte frame data required by the Frame Engine.
+// Takes the compiled function from the Function Conversion Engine and the
+// current F value, evaluates every X,Y,Z position, determines the physical
+// LED number that is ON, and passes that physical LED position to the
+// Frame Engine.
 //
-// Frame data format:
-//   byte = Z*8 + Y
-//   bit  = X
-//   64 bytes = 512 voxels
-//
-// The function is NOT hard-coded here. F changes from frame to frame so the
-// same received function generates the complete animation.
+// Physical LED numbering follows Version2/LEDs:
+//   LED = Z*64 + Y*8 + X + 1
+//   LED001 = X0,Y0,Z0
+//   LED512 = X7,Y7,Z7
 
 namespace V2Animation {
 
 static const uint8_t TOTAL_FRAMES = 50;
 static uint8_t currentFrame = 0;
 
-// Frame callback used by the Function Conversion Engine evaluator.
+// Evaluate the compiled function at the current animation frame F.
 inline bool evaluateCurrentVoxel(uint8_t X, uint8_t Y, uint8_t Z) {
   return V2FunctionConversion::evaluate(X, Y, Z, currentFrame);
 }
 
-// Convert the current function at a specific F into one compatible frame.
+// Generate one frame from the compiled function.
+// Every ON coordinate is converted to its physical LED number and passed
+// individually to the Frame Engine.
 inline bool generateFrame(uint8_t frameIndex) {
   if (!V2FunctionConversion::isFunctionValid()) return false;
 
@@ -38,20 +38,23 @@ inline bool generateFrame(uint8_t frameIndex) {
   for (uint8_t Z = 0; Z < 8; Z++) {
     for (uint8_t Y = 0; Y < 8; Y++) {
       for (uint8_t X = 0; X < 8; X++) {
-        if (evaluateCurrentVoxel(X, Y, Z)) {
-          V2FrameEngine::setVoxel(X, Y, Z, true);
-        }
+        if (!evaluateCurrentVoxel(X, Y, Z)) continue;
+
+        // Physical LED number defined by Version2/LEDs/LED001...LED512.
+        const uint16_t ledNumber =
+          (uint16_t)Z * 64u + (uint16_t)Y * 8u + X + 1u;
+
+        V2FrameEngine::setLED(ledNumber);
       }
     }
   }
 
-  // The Frame Engine now owns a complete 64-byte compatible frame.
+  // Frame Engine now owns the complete 512-LED frame.
   V2FrameEngine::submit();
   return true;
 }
 
-// Generate the next animation frame. The same received function is reused;
-// only F advances.
+// Generate the next animation frame using the same compiled function.
 inline bool generateNextFrame() {
   bool ok = generateFrame(currentFrame);
   currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
