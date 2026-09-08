@@ -5,13 +5,18 @@
 
 // V2 Frame Engine
 // ---------------
-// Receives one complete 512-voxel frame as 64 bytes (8 bits per byte).
-// Byte index = Z*8 + Y; bit index = X.
-// Therefore each frame is exactly 64 bytes.
+// Receives physical LED positions from the Animation Engine and combines
+// them into one complete 512-LED frame.
 //
-// The Frame Engine does not know how the animation was generated. It only
-// accepts compatible frame data and hands it to the existing V2 display
-// engine.
+// Physical LED numbering:
+//   LED = Z*64 + Y*8 + X + 1
+//   LED001 = X0,Y0,Z0
+//   LED512 = X7,Y7,Z7
+//
+// Frame data format:
+//   byte = Z*8 + Y
+//   bit  = X
+//   64 bytes = 512 LEDs
 
 namespace V2FrameEngine {
 
@@ -21,6 +26,21 @@ inline void clear() {
   memset(frameData, 0, sizeof(frameData));
 }
 
+// Receive one physical LED position from the Animation Engine.
+inline void setLED(uint16_t ledNumber) {
+  if (ledNumber < 1 || ledNumber > 512) return;
+
+  const uint16_t zeroBased = ledNumber - 1;
+  const uint8_t Z = zeroBased / 64;
+  const uint8_t remainder = zeroBased % 64;
+  const uint8_t Y = remainder / 8;
+  const uint8_t X = remainder % 8;
+
+  const uint8_t index = Z * 8 + Y;
+  frameData[index] |= (uint8_t)(1 << X);
+}
+
+// Retained for direct frame manipulation where needed.
 inline void setVoxel(uint8_t X, uint8_t Y, uint8_t Z, bool on) {
   if (X > 7 || Y > 7 || Z > 7) return;
   const uint8_t index = Z * 8 + Y;
