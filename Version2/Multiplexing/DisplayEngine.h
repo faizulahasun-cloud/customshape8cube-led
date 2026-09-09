@@ -52,8 +52,10 @@ inline uint8_t columnIndex(uint8_t x, uint8_t y) {
   return y * 8 + x;
 }
 
-static volatile uint8_t voxelBuffer[2][8][8][8];
-static volatile uint8_t activeBuffer = 0;
+// Match the old firmware's 8x8 layer display buffer.
+// displayBuffer[Z][register] contains the already-mapped 8 column bytes
+// for one Z layer. A complete frame is copied atomically into it.
+static volatile uint8_t displayBuffer[8][8];
 
 // Current multiplexed layer. Accessed only by the refresh ISR.
 static volatile uint8_t currentLayer = 0;
@@ -64,35 +66,32 @@ static volatile uint8_t brightnessAccumulator[8] = {0,0,0,0,0,0,0,0};
 
 using FrameVoxelFunction = bool (*)(uint8_t X, uint8_t Y, uint8_t Z);
 
-inline void clearBuffer(uint8_t bufferIndex) {
-  memset((void *)voxelBuffer[bufferIndex], 0, 512);
-}
-
-// Generate one complete 512-voxel frame into the inactive buffer.
-// The active display buffer is untouched while this runs.
+// Generate one complete frame in the same 8-byte-per-layer form used by the
+// old firmware, then copy all 64 bytes atomically into the display buffer.
 inline void buildFrame(FrameVoxelFunction frameFunction) {
-  const uint8_t inactive = activeBuffer ^ 1;
+  uint8_t nextDisplayBuffer[8][8] = {{0}};
 
   for (uint8_t z = 0; z < 8; z++) {
     for (uint8_t y = 0; y < 8; y++) {
       for (uint8_t x = 0; x < 8; x++) {
-        voxelBuffer[inactive][z][y][x] = frameFunction(x, y, z) ? 1 : 0;
+        if (!frameFunction(x, y, z)) continue;
+
+        const uint8_t c = columnIndex(x, y);
+        const ColumnMap map = COLUMN_MAP[c];
+        if (map.reg >= 1 && map.reg <= 8 && map.bit <= 7) {
+          nextDisplayBuffer[z][map.reg - 1] |= (uint8_t)(1 << map.bit);
+        }
       }
     }
   }
 
-  // Swap only after all 512 voxels are complete.
   noInterrupts();
-  activeBuffer = inactive;
+  memcpy((void *)displayBuffer, nextDisplayBuffer, 64);
   interrupts();
 }
 
 inline void setBrightness(uint8_t brightness) {
   globalBrightness = (brightness > 8) ? 8 : brightness;
-}
-
-inline uint8_t getActiveBuffer() {
-  return activeBuffer;
 }
 
 inline void setLayer(uint8_t layer) {
@@ -118,11 +117,9 @@ inline void latchFast() {
   PORTB &= ~_BV(PB4);
 }
 
-// Convert the selected Z layer of the active 512-voxel buffer into the
-// mapped 8 column-register bytes and transfer them to the shift registers.
+// Refresh one Z layer exactly through the old firmware's 8x8 layer buffer.
 inline void refreshDisplay() {
   const uint8_t layer = currentLayer;
-  const uint8_t buffer = activeBuffer;
 
   // Blank all outputs before changing layer/column data to prevent ghosting.
   shiftByteFast(0);
@@ -133,28 +130,13 @@ inline void refreshDisplay() {
   const bool layerEnabled = brightnessAccumulator[layer] >= 8;
   if (layerEnabled) brightnessAccumulator[layer] -= 8;
 
-  // Layer byte: one-hot layer selection, same as the existing hardware logic.
+  // Layer byte: one-hot layer selection, same as the old firmware.
   shiftByteFast(layerEnabled ? (1 << layer) : 0);
 
-  // Build each physical shift-register byte from the explicit V2 mapping.
-  // COLUMN_MAP index = Y*8+X; reg/bit determine the physical output.
-  uint8_t columnBytes[8] = {0,0,0,0,0,0,0,0};
-
-  for (uint8_t y = 0; y < 8; y++) {
-    for (uint8_t x = 0; x < 8; x++) {
-      if (!voxelBuffer[buffer][layer][y][x]) continue;
-
-      const uint8_t c = columnIndex(x, y);
-      const ColumnMap map = COLUMN_MAP[c];
-      if (map.reg >= 1 && map.reg <= 8 && map.bit <= 7) {
-        columnBytes[map.reg - 1] |= (uint8_t)(1 << map.bit);
-      }
-    }
-  }
-
-  // The physical shift chain receives register 8 first, then 7 ... 1.
+  // The buffer already contains the physical register bytes, so the ISR
+  // performs no 512-voxel reconstruction. This matches the old path.
   for (int8_t reg = 7; reg >= 0; reg--) {
-    shiftByteFast(columnBytes[reg]);
+    shiftByteFast(displayBuffer[layer][reg]);
   }
 
   latchFast();
