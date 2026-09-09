@@ -29,7 +29,8 @@ enum OpCode : uint8_t {
   OP_LT, OP_LE, OP_GT, OP_GE, OP_EQ, OP_NE, OP_AND, OP_OR
 };
 
-struct Instruction { uint8_t op; int16_t value; };
+// Constants are stored as float so decimal literals such as 3.5 are preserved.
+struct Instruction { uint8_t op; float value; };
 
 static char functionBuffer[MAX_FUNCTION_LENGTH + 1];
 static uint16_t functionLength = 0;
@@ -53,7 +54,7 @@ inline void clearFunction() {
   parseError = false;
   functionBuffer[0] = '\0';
   bytecode[0].op = OP_END;
-  bytecode[0].value = 0;
+  bytecode[0].value = 0.0f;
 }
 
 // '@' starts a new function and clears the previous one.
@@ -73,7 +74,7 @@ inline bool receiveCharacter(char c) {
     parseError = false;
     functionBuffer[0] = '\0';
     bytecode[0].op = OP_END;
-    bytecode[0].value = 0;
+    bytecode[0].value = 0.0f;
     return false;
   }
 
@@ -117,7 +118,7 @@ inline bool matchChar(char c) {
   if (parsePosition < functionLength && functionBuffer[parsePosition] == c) { parsePosition++; return true; }
   return false;
 }
-inline bool emit(uint8_t op, int16_t value = 0) {
+inline bool emit(uint8_t op, float value = 0.0f) {
   if (bytecodeLength >= MAX_BYTECODE_LENGTH - 1) { parseError = true; return false; }
   bytecode[bytecodeLength].op = op; bytecode[bytecodeLength].value = value; bytecodeLength++; return true;
 }
@@ -126,14 +127,39 @@ inline bool parseExpression();
 inline bool parseNumber() {
   skipSpaces();
   if (parsePosition >= functionLength || functionBuffer[parsePosition] < '0' || functionBuffer[parsePosition] > '9') return false;
-  int16_t value = 0;
+
+  float value = 0.0f;
   while (parsePosition < functionLength) {
     char c = functionBuffer[parsePosition];
     if (c < '0' || c > '9') break;
-    if (value > 3276 || (value == 3276 && c > '7')) { parseError = true; return false; }
-    value = (int16_t)(value * 10 + (c - '0')); parsePosition++;
+    value = value * 10.0f + (float)(c - '0');
+    if (value > 32767.0f) { parseError = true; return false; }
+    parsePosition++;
   }
+
+  if (parsePosition < functionLength && functionBuffer[parsePosition] == '.') {
+    parsePosition++;
+    if (parsePosition >= functionLength || functionBuffer[parsePosition] < '0' || functionBuffer[parsePosition] > '9') {
+      parseError = true;
+      return false;
+    }
+
+    float place = 0.1f;
+    while (parsePosition < functionLength) {
+      char c = functionBuffer[parsePosition];
+      if (c < '0' || c > '9') break;
+      value += (float)(c - '0') * place;
+      place *= 0.1f;
+      parsePosition++;
+    }
+  }
+
   return emit(OP_CONST, value);
+}
+
+inline char upperAscii(char c) {
+  if (c >= 'a' && c <= 'z') return (char)(c - 'a' + 'A');
+  return c;
 }
 
 inline bool parseIdentifier() {
@@ -147,17 +173,26 @@ inline bool parseIdentifier() {
   }
   if (start == parsePosition) return false;
   uint16_t n = parsePosition - start;
-  const char *name = &functionBuffer[start];
-  if (n == 1 && name[0] == 'X') return emit(OP_X);
-  if (n == 1 && name[0] == 'Y') return emit(OP_Y);
-  if (n == 1 && name[0] == 'Z') return emit(OP_Z);
-  if (n == 1 && name[0] == 'F') return emit(OP_F);
+
+  if (n == 1) {
+    char name0 = upperAscii(functionBuffer[start]);
+    if (name0 == 'X') return emit(OP_X);
+    if (name0 == 'Y') return emit(OP_Y);
+    if (name0 == 'Z') return emit(OP_Z);
+    if (name0 == 'F') return emit(OP_F);
+  }
+
   if (!matchChar('(')) { parseError = true; return false; }
   if (!parseExpression() || !matchChar(')')) return false;
-  if (n == 3 && name[0] == 'S' && name[1] == 'I' && name[2] == 'N') return emit(OP_SIN);
-  if (n == 3 && name[0] == 'C' && name[1] == 'O' && name[2] == 'S') return emit(OP_COS);
-  if (n == 4 && name[0] == 'S' && name[1] == 'Q' && name[2] == 'R' && name[3] == 'T') return emit(OP_SQRT);
-  if (n == 3 && name[0] == 'A' && name[1] == 'B' && name[2] == 'S') return emit(OP_ABS);
+
+  char n0 = n > 0 ? upperAscii(functionBuffer[start]) : 0;
+  char n1 = n > 1 ? upperAscii(functionBuffer[start + 1]) : 0;
+  char n2 = n > 2 ? upperAscii(functionBuffer[start + 2]) : 0;
+  char n3 = n > 3 ? upperAscii(functionBuffer[start + 3]) : 0;
+  if (n == 3 && n0 == 'S' && n1 == 'I' && n2 == 'N') return emit(OP_SIN);
+  if (n == 3 && n0 == 'C' && n1 == 'O' && n2 == 'S') return emit(OP_COS);
+  if (n == 4 && n0 == 'S' && n1 == 'Q' && n2 == 'R' && n3 == 'T') return emit(OP_SQRT);
+  if (n == 3 && n0 == 'A' && n1 == 'B' && n2 == 'S') return emit(OP_ABS);
   parseError = true; return false;
 }
 inline bool parsePrimary() {
