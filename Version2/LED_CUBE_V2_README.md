@@ -8,8 +8,9 @@
 - LED number = Z*64 + Y*8 + X + 1
 - V2 keeps each physical LED as an individual definition in `LEDs/`.
 - Frame files combine LED definitions; `+` means visual OR/combination, not arithmetic addition.
-- Animation structure/files are **not defined yet**. No `Animation001`, `Animation002`, etc. are assumed or created.
-- `Main.ino` will be added later, after the engines are finalized.
+- Animation engine will get animation from function conversion engine. then convert that data according to led definition files and send led position data to frame engine serially 1 by 1.
+-then frame engine according to led position data follow the led files to create the frames 1 after another according to requirements. then send frame data to display engine
+- `Main.ino` will responsible for send data from one engine to next engine according to logic.
 - Existing files are not deleted unless explicitly requested.
 
 ## V2 data flow
@@ -42,25 +43,9 @@ Multiplexing
 - `FrameEngine` builds the current 512-LED frame and passes the display frame to `DisplayEngine`.
 - `DisplayEngine` is the final hardware/display stage and handles the multiplexing of the cube.
 - The engines are intended to pass their generated data sequentially rather than each engine independently implementing the whole system.
-- The current V2 engines have the basic interfaces needed for this pipeline, but the complete end-to-end connection/orchestration is not implemented yet because `Main.ino` does not exist.
+- The current V2 engines have the basic interfaces needed for this pipeline, but the complete end-to-end connection/orchestration is implemented by `Main.ino` 
 
-## V2 structure currently planned
 
-```text
-Version2/
-├── Main.ino                 ← added later
-├── LEDs/
-│   └── LED001.h ... LED512.h
-├── Frames/
-│   ├── Frame001.h ...
-│   └── FrameEngine.h
-├── Animations/
-│   └── animation structure to be decided later
-├── FunctionConversion/
-│   └── FunctionConversionEngine.h
-└── Multiplexing/
-    └── DisplayEngine.h
-```
 
 ## Development rule
 
