@@ -3,18 +3,19 @@
 #include <Arduino.h>
 #include "../FunctionConversion/FunctionConversionEngine.h"
 #include "../Frames/FrameEngine.h"
+#include "../LEDs/LEDDefinitions.h"
 
 // V2 Animation Engine
 // -------------------
-// Takes the compiled function from the Function Conversion Engine and the
-// current F value, evaluates every X,Y,Z position, determines the physical
-// LED number that is ON, and passes that physical LED position to the
-// Frame Engine.
+// Evaluates the compiled function for every physical LED definition.
+// LED001.h ... LED512.h are the source of truth for the physical X/Y/Z
+// position of each LED. No LED-number formula is used here.
 //
-// Physical LED numbering follows Version2/LEDs:
-//   LED = Z*64 + Y*8 + X + 1
-//   LED001 = X0,Y0,Z0
-//   LED512 = X7,Y7,Z7
+// One frame is generated at a time:
+//   Function Conversion -> individual LED definitions -> Frame Engine
+//   -> Display Engine
+// The completed frame is submitted immediately; frames are not stored as
+// 50 simultaneous RAM buffers and the .h source files are not rewritten.
 
 namespace V2Animation {
 
@@ -26,30 +27,27 @@ inline bool evaluateCurrentVoxel(uint8_t X, uint8_t Y, uint8_t Z) {
   return V2FunctionConversion::evaluate(X, Y, Z, currentFrame);
 }
 
-// Generate one frame from the compiled function.
-// Every ON coordinate is converted to its physical LED number and passed
-// individually to the Frame Engine.
+// Generate exactly one frame from the individual physical LED definitions.
+// LED number is the position in LED001.h ... LED512.h.
 inline bool generateFrame(uint8_t frameIndex) {
   if (!V2FunctionConversion::isFunctionValid()) return false;
 
   currentFrame = frameIndex % TOTAL_FRAMES;
   V2FrameEngine::clear();
 
-  for (uint8_t Z = 0; Z < 8; Z++) {
-    for (uint8_t Y = 0; Y < 8; Y++) {
-      for (uint8_t X = 0; X < 8; X++) {
-        if (!evaluateCurrentVoxel(X, Y, Z)) continue;
+  // Walk the physical LED definitions directly. Each LED file supplies the
+  // coordinates used for evaluating the user's function.
+  for (uint16_t ledIndex = 0; ledIndex < 512; ledIndex++) {
+    const V2LEDDefinitions::Definition &led =
+      V2LEDDefinitions::DEFINITIONS[ledIndex];
 
-        // Physical LED number defined by Version2/LEDs/LED001...LED512.
-        const uint16_t ledNumber =
-          (uint16_t)Z * 64u + (uint16_t)Y * 8u + X + 1u;
+    if (!evaluateCurrentVoxel(led.x, led.y, led.z)) continue;
 
-        V2FrameEngine::setLED(ledNumber);
-      }
-    }
+    // ledIndex 0 = LED001, ledIndex 511 = LED512.
+    V2FrameEngine::setLED(ledIndex + 1);
   }
 
-  // Frame Engine now owns the complete 512-LED frame.
+  // Pass this completed frame immediately to the Display Engine.
   V2FrameEngine::submit();
   return true;
 }
@@ -58,19 +56,16 @@ inline void reset() {
   currentFrame = 0;
 }
 
-// Start the current compiled function immediately from animation frame F=0.
-// This is the entry point the runtime controller uses after a new function
-// has been successfully compiled.
+// Start at animation frame F=0.
 inline bool start() {
   reset();
   return generateFrame(0);
 }
 
-// Generate the next animation frame using the same compiled function.
+// Generate the next frame sequentially: 0, 1, 2, ... 49, then repeat.
 inline bool generateNextFrame() {
-  bool ok = generateFrame(currentFrame);
-  currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
-  return ok;
+  const uint8_t nextFrame = (currentFrame + 1) % TOTAL_FRAMES;
+  return generateFrame(nextFrame);
 }
 
 inline uint8_t frameIndex() {
