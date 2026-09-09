@@ -46,7 +46,7 @@ Multiplexing
 - The current V2 engines have the basic interfaces needed for this pipeline, but the complete end-to-end connection/orchestration is implemented by `Main.ino` 
 
 **********
-valid Character only uppercase***
+valid Character list***
 
 Meaning
 
@@ -54,25 +54,29 @@ Meaning
 
 Start of mathematical function
 
-X
+X / x
 
 X coordinate variable
 
-Y
+Y / y
 
 Y coordinate variable
 
-Z
+Z / z
 
 Z coordinate variable
 
-F
+F / f
 
 Animation frame variable
 
 0–9
 
 Integer digits
+
+.
+
+Decimal point for decimal numbers
 
 +
 
@@ -126,19 +130,19 @@ Opening parenthesis
 
 Closing parenthesis
 
-S I N
+S I N / s i n
 
 SIN()
 
-C O S
+C O S / c o s
 
 COS()
 
-S Q R T
+S Q R T / s q r t
 
 SQRT()
 
-A B S
+A B S / a b s
 
 ABS()
 
