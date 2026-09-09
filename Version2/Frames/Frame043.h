@@ -1,18 +1,10 @@
 #pragma once
+#include <Arduino.h>
+#include "FrameEngine.h"
 
-// V2 Frame 043
-// 512-voxel frame formula.
-// Coordinates: X=0..7, Y=0..7, Z=0..7.
-// Frame index: F=42.
-
+// V2 Frame 043 = animation frame F=42.
 #define FRAME043_INDEX 42
 
-// Returns true when voxel (X,Y,Z) is ON for this frame.
-inline bool frame043Voxel(uint8_t X, uint8_t Y, uint8_t Z) {
-    const uint8_t F = FRAME043_INDEX;
-    (void)F;
-    (void)X;
-    (void)Y;
-    (void)Z;
-    return false;
-}
+inline void frame043Begin() { V2FrameEngine::clear(); }
+inline void frame043SetLED(uint16_t ledNumber) { V2FrameEngine::setLED(ledNumber); }
+inline void frame043Submit() { V2FrameEngine::submit(); }

@@ -1,18 +1,10 @@
 #pragma once
+#include <Arduino.h>
+#include "FrameEngine.h"
 
-// V2 Frame 027
-// 512-voxel frame formula.
-// Coordinates: X=0..7, Y=0..7, Z=0..7.
-// Frame index: F=26.
-
+// V2 Frame 027 = animation frame F=26.
 #define FRAME027_INDEX 26
 
-// Returns true when voxel (X,Y,Z) is ON for this frame.
-inline bool frame027Voxel(uint8_t X, uint8_t Y, uint8_t Z) {
-    const uint8_t F = FRAME027_INDEX;
-    (void)F;
-    (void)X;
-    (void)Y;
-    (void)Z;
-    return false;
-}
+inline void frame027Begin() { V2FrameEngine::clear(); }
+inline void frame027SetLED(uint16_t ledNumber) { V2FrameEngine::setLED(ledNumber); }
+inline void frame027Submit() { V2FrameEngine::submit(); }
