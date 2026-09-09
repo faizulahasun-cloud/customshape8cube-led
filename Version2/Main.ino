@@ -57,19 +57,19 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 static void setupDisplayTimer2() {
-  // Timer2 CTC at 500 Hz:
-  // 16 MHz / 64 / (499 + 1) = 500 Hz.
-  // Each interrupt advances one Z layer, giving 62.5 complete cube scans/s.
+  // Exact same Timer2 CTC configuration as the old firmware.
+  // 16 MHz / 1024 / (3 + 1) = 3906.25 Hz ISR.
+  // Each interrupt advances one Z layer, giving 488.28125 complete cube scans/s.
   noInterrupts();
 
   TCCR2A = 0;
   TCCR2B = 0;
   TCNT2 = 0;
-  OCR2A = 249;
+  OCR2A = 3;
 
-  // CTC mode, prescaler /64.
+  // CTC mode, prescaler /1024.
   TCCR2A |= _BV(WGM21);
-  TCCR2B |= _BV(CS22);
+  TCCR2B |= _BV(CS22) | _BV(CS21) | _BV(CS20);
   TIMSK2 |= _BV(OCIE2A);
 
   interrupts();
