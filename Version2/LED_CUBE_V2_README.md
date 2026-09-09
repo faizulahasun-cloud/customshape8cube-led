@@ -45,6 +45,110 @@ Multiplexing
 - The engines are intended to pass their generated data sequentially rather than each engine independently implementing the whole system.
 - The current V2 engines have the basic interfaces needed for this pipeline, but the complete end-to-end connection/orchestration is implemented by `Main.ino` 
 
+**********
+valid Character only uppercase***
+
+Meaning
+
+@
+
+Start of mathematical function
+
+X
+
+X coordinate variable
+
+Y
+
+Y coordinate variable
+
+Z
+
+Z coordinate variable
+
+F
+
+Animation frame variable
+
+0–9
+
+Integer digits
+
++
+
+Addition
+
+-
+
+Subtraction / unary minus
+
+*
+
+Multiplication
+
+/
+
+Division
+
+%
+
+Modulo
+
+!
+
+NOT
+
+<
+
+Less than
+
+>
+
+Greater than
+
+=
+
+Used for ==, <=, >=
+
+&
+
+Used for &&
+
+`
+
+`
+
+(
+
+Opening parenthesis
+
+)
+
+Closing parenthesis
+
+S I N
+
+SIN()
+
+C O S
+
+COS()
+
+S Q R T
+
+SQRT()
+
+A B S
+
+ABS()
+
+\n
+
+Function complete / execute
+
+\r
+
+Ignored
 
 
 ## Development rule
