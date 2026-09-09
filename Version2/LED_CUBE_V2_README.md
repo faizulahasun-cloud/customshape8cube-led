@@ -5,94 +5,65 @@
 - LED001 is the bottom-layer LED at Column 1.
 - Columns 1–8 are the FRONT face.
 - Numbering proceeds through the physical cube from this starting point.
-- LED number= Z*64 + Y*8+ X+ 1
+- LED number = Z*64 + Y*8 + X + 1
 - V2 keeps each physical LED as an individual definition in `LEDs/`.
 - Frame files combine LED definitions; `+` means visual OR/combination, not arithmetic addition.
-- Animation files sequence frames.
-- Multiplexing remains a separate display-engine layer.
+- Animation structure/files are **not defined yet**. No `Animation001`, `Animation002`, etc. are assumed or created.
+- `Main.ino` will be added later, after the engines are finalized.
+- Existing files are not deleted unless explicitly requested.
 
-## Required V2 structure
+## V2 data flow
+
+```text
+Bluetooth
+   ↓
+Function Character Bytes
+   ↓
+FunctionConversionEngine
+   ↓
+AnimationEngine
+   ↓
+LED positions / frame data
+   ↓
+FrameEngine
+   ↓
+DisplayEngine
+   ↓
+Multiplexing
+   ↓
+8×8×8 Cube
+```
+
+## Engine architecture
+
+- Bluetooth sends function character bytes to `FunctionConversionEngine`.
+- `FunctionConversionEngine` processes the received function data and passes the resulting information to `AnimationEngine`.
+- `AnimationEngine` generates the required LED positions / frame data and passes it to `FrameEngine`.
+- `FrameEngine` builds the current 512-LED frame and passes the display frame to `DisplayEngine`.
+- `DisplayEngine` is the final hardware/display stage and handles the multiplexing of the cube.
+- The engines are intended to pass their generated data sequentially rather than each engine independently implementing the whole system.
+- The current V2 engines have the basic interfaces needed for this pipeline, but the complete end-to-end connection/orchestration is not implemented yet because `Main.ino` does not exist.
+
+## V2 structure currently planned
 
 ```text
 Version2/
-├── Main.ino
+├── Main.ino                 ← added later
 ├── LEDs/
-│   ├── LED001.h ... LED512.h
+│   └── LED001.h ... LED512.h
 ├── Frames/
 │   ├── Frame001.h ...
+│   └── FrameEngine.h
 ├── Animations/
-│   ├── Animation001.h ...
+│   └── animation structure to be decided later
+├── FunctionConversion/
+│   └── FunctionConversionEngine.h
 └── Multiplexing/
     └── DisplayEngine.h
 ```
-             BLUETOOTH
-                 │
-                 ▼
-        Animation Selector
-                 │
-                 ▼
-          Animation 01
-                 │
-       ┌─────────┼─────────┐
-       ▼         ▼         ▼
-    Frame 1   Frame 2   Frame 3 ...
-       │         │         │
-       ▼         ▼         ▼
-  LED .h files combined for each frame
-                 │
-                 ▼
-          Current 512-LED Frame
-                 │
-                 ▼
-        EXISTING MULTIPLEXING
-                 │
-       ┌─────────┼─────────┐
-       ▼         ▼         ▼
-    Layer 1   Layer 2 ... Layer 8
-                 │
-                 ▼
-          Shift Registers
-                 │
-                 ▼
-             8×8×8 Cube
 
-LED_CUBE/
-│
-├── Main.ino
-│
-├── LEDs/
-│   ├── LED001.h
-│   ├── LED002.h
-│   ├── LED003.h
-│   ├── ...
-│   └── LED512.h
-│
-├── Frames/
-│   ├── Frame001.h
-│   ├── Frame002.h
-│   ├── Frame003.h
-│   └── ...
-│
-├── Animations/
-│   ├── Animation001.h
-│   ├── Animation002.h
-│   └── ...
-│
-└── Multiplexing/
-    └── DisplayEngine.h
+## Development rule
 
-LED001.h ─┐
-LED002.h ─┤
-LED075.h ─┼──→ Frame001.h
-LED079.h ─┤
-LED270.h ─┤
-LED402.h ─┘
-                ↓
-          Animation001.h
-                ↓
-        Multiplexing engine
-                ↓
-             Cube
-Follow this pattern and start creat step by step. If any confusion ask me. Before every step get confirmation from me. Got it? For pins follow our current files. Don’t delete them .
+Build and modify Version 2 step by step. Before each step, obtain confirmation. If anything is unclear, ask before making changes. Follow the pin definitions already present in the current files. Do not delete existing files unless explicitly requested.
 
 Existing files outside `Version2/` are not modified or deleted.
