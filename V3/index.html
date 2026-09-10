@@ -14,10 +14,13 @@
     .buttons { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
     button { border:0; border-radius:6px; padding:12px 18px; font-weight:bold; cursor:pointer; background:#008cba; color:white; }
     button:hover { background:#005f73; }
+    button:disabled { opacity:0.45; cursor:not-allowed; }
     .connect { background:#28a745; }
     .disconnect { background:#dc3545; }
     .next { background:#ffc107; color:#212529; }
     .custom { background:#9b59b6; }
+    .customAction { background:#8e44ad; }
+    .run { background:#16a085; }
     textarea { width:100%; height:170px; box-sizing:border-box; resize:vertical; background:#111; color:#39ff14; border:1px solid #444; border-radius:6px; padding:10px; font-family:monospace; font-size:14px; }
     .note { color:#bbb; font-size:13px; line-height:1.5; }
 </style>
@@ -30,29 +33,62 @@
         <button class="connect" id="connectBtn" onclick="connectBLE()">Connect HM-10</button>
         <button class="disconnect" id="disconnectBtn" onclick="disconnectBLE()" style="display:none">Disconnect</button>
     </div>
+
     <h3>Cube Controls</h3>
     <div class="buttons">
-        <button onclick="sendCommand('A')">Auto (A)</button>
-        <button onclick="sendCommand('M')">Manual (M)</button>
-        <button class="next" onclick="sendCommand('N')">Next Animation (N)</button>
-        <button class="custom" onclick="sendCustomFunction()">Custom Mood (C)</button>
+        <button onclick="sendCommand('A'); setNormalMode()">Auto (A)</button>
+        <button onclick="sendCommand('M'); setNormalMode()">Manual (M)</button>
+        <button class="next" onclick="sendCommand('N'); setNormalMode()">Next Animation (N)</button>
+        <button class="custom" id="customMoodBtn" onclick="selectCustomMood()">Custom Mood (C)</button>
     </div>
+
     <h3>Custom Function</h3>
     <textarea id="functionInput"></textarea>
+    <div class="buttons" style="margin-top:10px">
+        <button class="customAction" id="sendFunctionBtn" onclick="sendFunction()" disabled>Send Function</button>
+        <button class="run" id="runAnimationBtn" onclick="runCustomAnimation()" disabled>Run Animation</button>
+    </div>
     <p class="note">
-        Enter one V3 mathematical expression. Press <b>Custom Mood</b> to send <b>C</b> first, then the function as<br>
-        <b>@expression\n</b><br>
-        The function replaces the last successfully converted custom animation. X, Y, Z and F are supported, including decimals and the V3 math operators/functions.
+        Custom Mood only selects the custom mood. It does not send or compile a function.<br>
+        <b>Send Function</b> sends the expression as <b>@expression\n</b> and compiles it on the Arduino without starting it.<br>
+        <b>Run Animation</b> starts the currently compiled custom function. There is no preloaded custom function in this page.
     </p>
 </div>
 <script>
 let bleDevice = null;
 let bleCharacteristic = null;
 let writeQueue = Promise.resolve();
+let customMoodSelected = false;
+let functionSent = false;
+
 const UART_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
 const UART_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
 const BLE_CHUNK_SIZE = 20;
 const BLE_CHUNK_DELAY_MS = 20;
+
+function updateCustomButtons() {
+    document.getElementById('sendFunctionBtn').disabled = !customMoodSelected;
+    document.getElementById('runAnimationBtn').disabled = !customMoodSelected || !functionSent;
+}
+
+function setNormalMode() {
+    customMoodSelected = false;
+    functionSent = false;
+    updateCustomButtons();
+}
+
+async function selectCustomMood() {
+    customMoodSelected = true;
+    functionSent = false;
+    updateCustomButtons();
+    try {
+        await sendCommand('C');
+    } catch (error) {
+        console.error(error);
+        alert("Custom Mood selection failed: " + error.message);
+    }
+}
+
 async function connectBLE() {
     try {
         bleDevice = await navigator.bluetooth.requestDevice({
@@ -69,6 +105,7 @@ async function connectBLE() {
         alert("Bluetooth connection failed: " + error.message);
     }
 }
+
 function setStatus(connected) {
     const status = document.getElementById('status');
     status.textContent = connected ? 'BLUETOOTH: CONNECTED' : 'BLUETOOTH: DISCONNECTED';
@@ -76,11 +113,13 @@ function setStatus(connected) {
     document.getElementById('connectBtn').style.display = connected ? 'none' : 'inline-block';
     document.getElementById('disconnectBtn').style.display = connected ? 'inline-block' : 'none';
 }
+
 function onDisconnected() {
     bleCharacteristic = null;
     bleDevice = null;
     setStatus(false);
 }
+
 async function disconnectBLE() {
     if (bleCharacteristic) {
         try { await sendCommand('A'); } catch (error) { console.error(error); }
@@ -88,6 +127,7 @@ async function disconnectBLE() {
     if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
     else onDisconnected();
 }
+
 function queueWrite(bytes) {
     const operation = writeQueue.then(async () => {
         if (!bleCharacteristic) throw new Error("Connect the HM-10 first.");
@@ -101,16 +141,20 @@ function queueWrite(bytes) {
     writeQueue = operation.catch(() => {});
     return operation;
 }
+
 async function writeBytes(bytes) {
     return queueWrite(bytes);
 }
+
 async function sendCommand(command) {
     const encoder = new TextEncoder();
     try { return await writeBytes(encoder.encode(command)); }
     catch (error) { console.error(error); throw error; }
 }
-async function sendCustomFunction() {
+
+async function sendFunction() {
     let expression = document.getElementById('functionInput').value.trim();
+    if (!customMoodSelected) return;
     if (!expression) {
         alert("Enter a V3 function expression first.");
         return;
@@ -118,14 +162,28 @@ async function sendCustomFunction() {
     const payload = '@' + expression + '\n';
     const encoder = new TextEncoder();
     try {
-        await sendCommand('C');
         await writeBytes(encoder.encode(payload));
-        console.log("V3 custom function sent after C:", payload);
+        functionSent = true;
+        updateCustomButtons();
+        console.log("V3 custom function sent:", payload);
     } catch (error) {
         console.error(error);
         alert("Custom function transfer failed: " + error.message);
     }
 }
+
+async function runCustomAnimation() {
+    if (!customMoodSelected || !functionSent) return;
+    try {
+        await sendCommand('R');
+        console.log("V3 custom animation run command sent.");
+    } catch (error) {
+        console.error(error);
+        alert("Custom animation start failed: " + error.message);
+    }
+}
+
+updateCustomButtons();
 </script>
 </body>
 </html>
