@@ -1,0 +1,47 @@
+V3 CUSTOM FUNCTIONS 0-9
+========================
+
+10 separate custom digit functions for V3.
+Each digit is intended to move from the FRONT face toward the BACK face.
+
+Coordinate convention:
+X = left/right
+Y = front -> back
+Z = bottom/top
+F = animation frame
+
+IMPORTANT: These are the exact function expressions to copy one at a time.
+The current V3 function parser supports X,Y,Z,F and comparisons/operators.
+
+CUSTOM 0
+@((X==2)||(X==5))&&((Z>=1)&&(Z<=6))||((Z==1)||(Z==6))&&((X>=2)&&(X<=5))
+
+CUSTOM 1
+@(X==4)&&(Z>=1)&&(Z<=6)||((Z==1)&&(X>=3)&&(X<=5))
+
+CUSTOM 2
+@((Z==6)&&((X>=2)&&(X<=5)))||((Z==4)&&((X>=2)&&(X<=5)))||((Z==1)&&((X>=2)&&(X<=5)))||((X==5)&&((Z>=4)&&(Z<=6)))||((X==2)&&((Z>=1)&&(Z<=4)))
+
+CUSTOM 3
+@((Z==6)&&((X>=2)&&(X<=5)))||((Z==4)&&((X>=2)&&(X<=5)))||((Z==1)&&((X>=2)&&(X<=5)))||((X==5)&&((Z>=1)&&(Z<=6)))
+
+CUSTOM 4
+@((X==2)&&((Z>=4)&&(Z<=6)))||((X==5)&&((Z>=1)&&(Z<=6)))||((Z==4)&&((X>=2)&&(X<=5)))
+
+CUSTOM 5
+@((Z==6)&&((X>=2)&&(X<=5)))||((Z==4)&&((X>=2)&&(X<=5)))||((Z==1)&&((X>=2)&&(X<=5)))||((X==2)&&((Z>=4)&&(Z<=6)))||((X==5)&&((Z>=1)&&(Z<=4)))
+
+CUSTOM 6
+@((Z==6)&&((X>=2)&&(X<=5)))||((Z==4)&&((X>=2)&&(X<=5)))||((Z==1)&&((X>=2)&&(X<=5)))||((X==2)&&((Z>=1)&&(Z<=6)))||((X==5)&&((Z>=1)&&(Z<=4)))
+
+CUSTOM 7
+@((Z==6)&&((X>=2)&&(X<=5)))||((X==5)&&((Z>=1)&&(Z<=6)))
+
+CUSTOM 8
+@((Z==6)&&((X>=2)&&(X<=5)))||((Z==4)&&((X>=2)&&(X<=5)))||((Z==1)&&((X>=2)&&(X<=5)))||((X==2)&&((Z>=1)&&(Z<=6)))||((X==5)&&((Z>=1)&&(Z<=6)))
+
+CUSTOM 9
+@((Z==6)&&((X>=2)&&(X<=5)))||((Z==4)&&((X>=2)&&(X<=5)))||((X==2)&&((Z>=4)&&(Z<=6)))||((X==5)&&((Z>=1)&&(Z<=6)))||((Z==1)&&((X>=2)&&(X<=5)))
+
+NOTE:
+The expressions above are the 10 separate digit masks. They do NOT currently contain Y/F depth-motion logic. Current V3 evaluates the same function at every Y, so adding front-to-back motion requires including Y/F in each expression or changing the function design.
