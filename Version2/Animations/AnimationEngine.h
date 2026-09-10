@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "../FunctionConversion/FunctionConversionEngine.h"
+#include "BuiltInAnimations.h"
 
 // Every animation frame has its own FrameXXX.h pipeline stage.
 #include "../Frames/Frame001.h"
@@ -57,15 +58,23 @@
 
 // V2 Animation Engine
 // Data path for every frame:
-// Function Conversion -> direct X/Y/Z traversal -> FrameXXX.h -> FrameEngine -> DisplayEngine.
+// Function Conversion OR built-in animation predicate
+// -> direct X/Y/Z traversal -> FrameXXX.h -> FrameEngine -> DisplayEngine.
 // Only one 64-byte frame buffer is used at a time.
 namespace V2Animation {
 
 static const uint8_t TOTAL_FRAMES = 50;
+static const uint8_t TOTAL_BUILT_IN_ANIMATIONS = 27;
 static uint8_t currentFrame = 0;
+static uint8_t currentBuiltInAnimation = 0;
+static bool builtInMode = false;
 
 inline bool evaluateCurrentVoxel(uint8_t X, uint8_t Y, uint8_t Z) {
   return V2FunctionConversion::evaluate(X, Y, Z, currentFrame);
+}
+
+inline bool evaluateBuiltInVoxel(uint8_t X, uint8_t Y, uint8_t Z) {
+  return V2BuiltInAnimations::voxel(currentBuiltInAnimation, currentFrame, X, Y, Z);
 }
 
 inline void frameBegin(uint8_t frameIndex) {
@@ -161,6 +170,7 @@ inline void frameSubmit(uint8_t frameIndex) {
 inline bool generateFrame(uint8_t frameIndex) {
   if (!V2FunctionConversion::isFunctionValid()) return false;
 
+  builtInMode = false;
   currentFrame = frameIndex % TOTAL_FRAMES;
   frameBegin(currentFrame);
 
@@ -181,9 +191,64 @@ inline bool generateFrame(uint8_t frameIndex) {
   return true;
 }
 
-inline void reset() { currentFrame = 0; }
-inline bool start() { reset(); return generateFrame(0); }
-inline bool generateNextFrame() { return generateFrame((currentFrame + 1) % TOTAL_FRAMES); }
+inline bool generateBuiltInFrame(uint8_t frameIndex) {
+  currentFrame = frameIndex % TOTAL_FRAMES;
+  frameBegin(currentFrame);
+
+  for (uint8_t Z = 0; Z < 8; ++Z) {
+    for (uint8_t Y = 0; Y < 8; ++Y) {
+      for (uint8_t X = 0; X < 8; ++X) {
+        const uint16_t ledNumber = (uint16_t)Z * 64 + (uint16_t)Y * 8 + X + 1;
+        if (evaluateBuiltInVoxel(X, Y, Z)) {
+          frameSetLED(currentFrame, ledNumber);
+        }
+      }
+    }
+  }
+
+  frameSubmit(currentFrame);
+  return true;
+}
+
+inline void reset() {
+  currentFrame = 0;
+  builtInMode = false;
+}
+
+inline bool start() {
+  reset();
+  return generateFrame(0);
+}
+
+inline bool startBuiltIn(uint8_t animationIndex) {
+  currentBuiltInAnimation = animationIndex % TOTAL_BUILT_IN_ANIMATIONS;
+  currentFrame = 0;
+  builtInMode = true;
+  return generateBuiltInFrame(0);
+}
+
+inline bool generateNextFrame() {
+  if (builtInMode) return generateBuiltInFrame((currentFrame + 1) % TOTAL_FRAMES);
+  return generateFrame((currentFrame + 1) % TOTAL_FRAMES);
+}
+
+inline bool generateNextBuiltInFrame() {
+  builtInMode = true;
+  return generateBuiltInFrame((currentFrame + 1) % TOTAL_FRAMES);
+}
+
+inline void nextBuiltIn() {
+  currentBuiltInAnimation = (currentBuiltInAnimation + 1) % TOTAL_BUILT_IN_ANIMATIONS;
+  currentFrame = 0;
+}
+
+inline void setBuiltInAnimation(uint8_t animationIndex) {
+  currentBuiltInAnimation = animationIndex % TOTAL_BUILT_IN_ANIMATIONS;
+  currentFrame = 0;
+}
+
 inline uint8_t frameIndex() { return currentFrame; }
+inline uint8_t builtInAnimationIndex() { return currentBuiltInAnimation; }
+inline bool isBuiltInMode() { return builtInMode; }
 
 } // namespace V2Animation
