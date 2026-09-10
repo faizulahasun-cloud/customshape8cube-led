@@ -8,8 +8,8 @@
 // The engine never drives the cube or allocates LED frame buffers.
 namespace V3FunctionConversion {
 
-static const uint16_t MAX_FUNCTION_LENGTH = 96;
-static const uint8_t MAX_BYTECODE_LENGTH = 40;
+static const uint16_t MAX_FUNCTION_LENGTH = 192;
+static const uint8_t MAX_BYTECODE_LENGTH = 80;
 static const char FUNCTION_START='@';
 static const char FUNCTION_END='\n';
 
