@@ -9,47 +9,47 @@
 // ----------------
 // Complete runtime path:
 //
-// HM-10 Bluetooth
+// Built-in animations OR HM-10 function
 //      |
 //      v
-// AltSoftSerial receiver
-//      |
-//      v
-// V2FunctionConversion::receiveCharacter()
-//      |
-//      | newline received
-//      v
-// V2FunctionConversion::compileFunction()
-//      |
-//      v
-// V2Animation::start()
-//      |
-//      v
-// V2Animation::generateNextFrame()
+// V2Animation
 //      |
 //      v
 // FrameXXX.h -> FrameEngine -> DisplayEngine -> 8x8x8 multiplexing
 //
-// Bluetooth protocol:
+// Bluetooth protocol retained for V2 functions:
 //   '@' starts/restarts a function.
 //   '\n' terminates the function.
 //   '\r' is ignored so CRLF is also accepted.
 //
-// Example:
-//   @((F/2)%4==0&&X==0)||((F/2)%4==1&&Y==7)||((F/2)%4==2&&X==7)||((F/2)%4==3&&Y==0)\n
-// The V2 DisplayEngine already owns the physical cube pins:
-//   DATA  = D11
-//   LATCH = D12
-//   CLOCK = D13
-// AltSoftSerial on Arduino Uno uses its fixed pins:
-//   RX = D8, TX = D9
+// Old-firmware control characters restored:
+//   'A' = Auto mode
+//   'M' = Manual mode
+//   'N' = next built-in animation in Manual mode
+//
+// Hardware controls restored from the old firmware:
+//   POT A0 = brightness (2..8)
+//   TOUCH D10 = long press Auto/Manual, short press next animation in Manual
 
 AltSoftSerial HM10;
 
-// Generate the next animation frame outside the display ISR.
-// This keeps the Timer2 multiplexing ISR short and deterministic.
-static const uint16_t FRAME_INTERVAL_MS = 100;
+enum V2RuntimeMode : uint8_t {
+  MODE_AUTO = 0,
+  MODE_MANUAL = 1,
+  MODE_CUSTOM = 2
+};
+
+static V2RuntimeMode runtimeMode = MODE_AUTO;
+static const uint8_t TOUCH_PIN = 10;
+static const uint8_t POT_PIN = A0;
+static const uint8_t TOTAL_BUILT_IN_ANIMATIONS = 27;
+static const uint16_t BUILT_IN_FRAME_INTERVAL_MS = 200;
+static const uint16_t CUSTOM_FRAME_INTERVAL_MS = 100;
+static const uint32_t AUTO_MODE_CAROUSEL_TIME = 10000UL;
+static const uint32_t STARTUP_DELAY_TIME = 1000UL;
+
 static uint32_t nextFrameTime = 0;
+static uint32_t animationStart = 0;
 static bool animationRunning = false;
 
 ISR(TIMER2_COMPA_vect) {
@@ -75,61 +75,143 @@ static void setupDisplayTimer2() {
   interrupts();
 }
 
+static void startBuiltInAnimation(uint8_t animationIndex) {
+  animationIndex %= TOTAL_BUILT_IN_ANIMATIONS;
+  animationRunning = V2Animation::startBuiltIn(animationIndex);
+  animationStart = millis();
+  nextFrameTime = animationStart + BUILT_IN_FRAME_INTERVAL_MS;
+}
+
+static void nextBuiltInAnimation() {
+  V2Animation::nextBuiltIn();
+  animationRunning = V2Animation::generateBuiltInFrame(0);
+  animationStart = millis();
+  nextFrameTime = animationStart + BUILT_IN_FRAME_INTERVAL_MS;
+}
+
 static void processBluetoothCharacter(char c) {
-  // FunctionConversion owns the protocol state. Main only transports
-  // received characters into the V2 pipeline.
+  // Single-character controls are only commands when no '@...\n'
+  // function is currently being received. Function contents are untouched.
+  if (!V2FunctionConversion::isFunctionStarted()) {
+    if (c == 'A') {
+      runtimeMode = MODE_AUTO;
+      startBuiltInAnimation(V2Animation::builtInAnimationIndex());
+      return;
+    }
+
+    if (c == 'M') {
+      runtimeMode = MODE_MANUAL;
+      startBuiltInAnimation(V2Animation::builtInAnimationIndex());
+      return;
+    }
+
+    if (c == 'N' && runtimeMode == MODE_MANUAL) {
+      nextBuiltInAnimation();
+      return;
+    }
+  }
+
+  // FunctionConversion owns the function protocol state. Main only
+  // transports received characters into the existing V2 pipeline.
   if (!V2FunctionConversion::receiveCharacter(c)) return;
 
-  // A complete '@...\\n' function has arrived.
+  // A complete '@...\n' function has arrived.
   // Compile once; do not compile while the animation is running frame-by-frame.
   if (!V2FunctionConversion::compileFunction()) {
     animationRunning = false;
     return;
   }
 
-  // Start always generates frame F=0 through Frame001.h and the rest of V2.
+  runtimeMode = MODE_CUSTOM;
   animationRunning = V2Animation::start();
-  nextFrameTime = millis() + FRAME_INTERVAL_MS;
+  nextFrameTime = millis() + CUSTOM_FRAME_INTERVAL_MS;
+}
+
+static void updateTouchControls(uint32_t now) {
+  static bool lastTouch = false;
+  static uint32_t touchTimer = 0;
+  static bool longPress = false;
+
+  bool touch = digitalRead(TOUCH_PIN) == HIGH;
+
+  if (touch && !lastTouch) {
+    touchTimer = now;
+    longPress = false;
+  } else if (touch && lastTouch) {
+    if (!longPress && (now - touchTimer >= 3000UL)) {
+      // Same old-firmware behavior: long press toggles Auto/Manual.
+      runtimeMode = (runtimeMode == MODE_AUTO) ? MODE_MANUAL : MODE_AUTO;
+      startBuiltInAnimation(V2Animation::builtInAnimationIndex());
+      longPress = true;
+    }
+  } else if (!touch && lastTouch) {
+    uint32_t duration = now - touchTimer;
+    if (!longPress && runtimeMode == MODE_MANUAL && duration >= 50UL && duration < 3000UL) {
+      nextBuiltInAnimation();
+    }
+  }
+
+  lastTouch = touch;
 }
 
 void setup() {
-  // DisplayEngine uses PORTB directly, so explicitly configure its three
-  // physical shift-register pins as outputs before enabling multiplexing.
   pinMode(11, OUTPUT); // DATA  / PB3
   pinMode(12, OUTPUT); // LATCH / PB4
   pinMode(13, OUTPUT); // CLOCK / PB5
+  pinMode(TOUCH_PIN, INPUT);
+  pinMode(POT_PIN, INPUT);
 
   digitalWrite(11, LOW);
   digitalWrite(12, LOW);
   digitalWrite(13, LOW);
 
-  // HM-10 communication. The V2 pipeline accepts bytes; it does not depend
-  // on a command prompt or fixed packet size.
   HM10.begin(9600);
 
-  // Start with the display ISR running, but no animation until a valid
-  // Bluetooth function is received and compiled.
+  // Start with the display ISR running and the old firmware's Auto mode.
   V2DisplayEngine::setBrightness(4);
   setupDisplayTimer2();
+
+  delay(STARTUP_DELAY_TIME);
+  startBuiltInAnimation(0);
 }
 
 void loop() {
-  // Drain all currently available HM-10 bytes so Bluetooth reception does
-  // not unnecessarily block animation generation.
+  const uint32_t now = millis();
+
+  // Restore the old B10K brightness control. The V2 DisplayEngine keeps the
+  // same 0..8 brightness scale and the same Timer2 refresh path.
+  const uint8_t brightness = (uint8_t)map(analogRead(POT_PIN), 0, 1023, 2, 8);
+  V2DisplayEngine::setBrightness(brightness);
+
+  updateTouchControls(now);
+
   while (HM10.available() > 0) {
     processBluetoothCharacter((char)HM10.read());
   }
 
-  // Animation generation is deliberately outside the Timer2 ISR.
-  // Only one complete frame is generated at a time by AnimationEngine.
-  if (animationRunning) {
-    const uint32_t now = millis();
-    if ((int32_t)(now - nextFrameTime) >= 0) {
+  if (!animationRunning) return;
+
+  if ((int32_t)(now - nextFrameTime) >= 0) {
+    if (runtimeMode == MODE_CUSTOM) {
       if (!V2Animation::generateNextFrame()) {
         animationRunning = false;
       } else {
-        nextFrameTime = now + FRAME_INTERVAL_MS;
+        nextFrameTime = now + CUSTOM_FRAME_INTERVAL_MS;
       }
+      return;
+    }
+
+    // Auto and Manual both use the exact same 27 built-in animation
+    // pipeline. Auto additionally changes animation every 10 seconds.
+    if (!V2Animation::generateNextBuiltInFrame()) {
+      animationRunning = false;
+      return;
+    }
+
+    nextFrameTime = now + BUILT_IN_FRAME_INTERVAL_MS;
+
+    if (runtimeMode == MODE_AUTO && (now - animationStart >= AUTO_MODE_CAROUSEL_TIME)) {
+      nextBuiltInAnimation();
     }
   }
 }
