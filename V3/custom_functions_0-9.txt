@@ -56,4 +56,4 @@ Verified design intent:
 - At F=7, digit is on Y=7 BACK.
 - At F=8, motion repeats from Y=0 FRONT.
 - CUSTOM 9 is repaired so the right vertical and upper-left stroke stay within the intended Z=1..6 digit geometry.
-- This repaired CUSTOM 9 requires increased parser bytecode capacity to compile; no other V3 files are modified here.
+- The repaired CUSTOM 9 requires more than the current V3 parser bytecode capacity; sandbox validation must therefore use the requested increased-capacity parser simulation.
