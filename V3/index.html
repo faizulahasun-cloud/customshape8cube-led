@@ -5,123 +5,40 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>8x8x8 LED Cube V3 Controller</title>
 <style>
-    body { font-family: Arial, sans-serif; background:#1e1e24; color:#f4f4f9; padding:20px; }
-    .container { max-width:760px; margin:auto; background:#2a2a35; padding:25px; border-radius:12px; }
-    h1,h3 { color:#00d2ff; }
-    .status { padding:12px; margin-bottom:18px; border-radius:6px; text-align:center; font-weight:bold; }
-    .disconnected { background:#721c24; color:#f8d7da; }
-    .connected { background:#155724; color:#d4edda; }
-    .buttons { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
-    button { border:0; border-radius:6px; padding:12px 18px; font-weight:bold; cursor:pointer; background:#008cba; color:white; }
-    button:hover { background:#005f73; }
-    .connect { background:#28a745; }
-    .disconnect { background:#dc3545; }
-    .next { background:#ffc107; color:#212529; }
-    .custom { background:#9b59b6; }
-    textarea { width:100%; height:170px; box-sizing:border-box; resize:vertical; background:#111; color:#39ff14; border:1px solid #444; border-radius:6px; padding:10px; font-family:monospace; font-size:14px; }
-    .note { color:#bbb; font-size:13px; line-height:1.5; }
+body{font-family:Arial,sans-serif;background:#1e1e24;color:#f4f4f9;padding:20px}.container{max-width:760px;margin:auto;background:#2a2a35;padding:25px;border-radius:12px}h1,h3{color:#00d2ff}.status{padding:12px;margin-bottom:18px;border-radius:6px;text-align:center;font-weight:bold}.disconnected{background:#721c24;color:#f8d7da}.connected{background:#155724;color:#d4edda}.buttons{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}button{border:0;border-radius:6px;padding:12px 18px;font-weight:bold;cursor:pointer;background:#008cba;color:white}button:hover{background:#005f73}.connect{background:#28a745}.disconnect{background:#dc3545}.next{background:#ffc107;color:#212529}.custom{background:#9b59b6}textarea{width:100%;height:170px;box-sizing:border-box;resize:vertical;background:#111;color:#39ff14;border:1px solid #444;border-radius:6px;padding:10px;font-family:monospace;font-size:14px}.note{color:#bbb;font-size:13px;line-height:1.5}button:disabled{opacity:.45;cursor:not-allowed}
 </style>
 </head>
 <body>
 <div class="container">
-    <h1>8x8x8 LED Cube — V3</h1>
-    <div id="status" class="status disconnected">BLUETOOTH: DISCONNECTED</div>
-    <div class="buttons">
-        <button class="connect" id="connectBtn" onclick="connectBLE()">Connect HM-10</button>
-        <button class="disconnect" id="disconnectBtn" onclick="disconnectBLE()" style="display:none">Disconnect</button>
-    </div>
-    <h3>Cube Controls</h3>
-    <div class="buttons">
-        <button onclick="sendCommand('A')">Auto (A)</button>
-        <button onclick="sendCommand('M')">Manual (M)</button>
-        <button class="next" onclick="sendCommand('N')">Next Animation (N)</button>
-        <button class="custom" onclick="sendCommand('C')">Custom Mood</button>
-    </div>
-    <h3>Custom Function</h3>
-    <textarea id="functionInput">(X*3+Y*5+F)%16<8</textarea>
-    <p class="note">
-        Enter one V3 mathematical expression. The page sends it as<br>
-        <b>@expression\n</b><br>
-        The function is stored as the last custom animation. It is not activated until you press <b>Custom Mood</b>.
-        X, Y, Z and F are supported, including decimals and the V3 math operators/functions.
-    </p>
-    <div class="buttons">
-        <button class="connect" onclick="sendCustomFunction()">Send Custom Function</button>
-    </div>
+<h1>8x8x8 LED Cube — V3</h1>
+<div id="status" class="status disconnected">BLUETOOTH: DISCONNECTED</div>
+<div class="buttons"><button class="connect" id="connectBtn" onclick="connectBLE()">Connect HM-10</button><button class="disconnect" id="disconnectBtn" onclick="disconnectBLE()" style="display:none">Disconnect</button></div>
+<h3>Cube Controls</h3>
+<div class="buttons"><button id="autoBtn" onclick="sendCommand('A')" disabled>Auto (A)</button><button id="manualBtn" onclick="sendCommand('M')" disabled>Manual (M)</button><button class="next" id="nextBtn" onclick="sendCommand('N')" disabled>Next Animation (N)</button><button class="custom" id="customMoodBtn" onclick="sendCommand('C')" disabled>Custom Mood</button></div>
+<h3>Custom Function</h3>
+<textarea id="functionInput">(X*3+Y*5+F)%16<8</textarea>
+<p class="note">Enter one V3 mathematical expression. The page sends it as <b>@expression\n</b>. Sending stores/replaces the custom function but does not activate it. Use <b>Custom Mood</b> afterward. During a function transfer the page locks all cube commands until the transfer finishes.</p>
+<div class="buttons"><button class="connect" id="sendFunctionBtn" onclick="sendCustomFunction()" disabled>Send Custom Function</button></div>
+<div id="transferStatus" class="note">Controller idle.</div>
 </div>
 <script>
-let bleDevice = null;
-let bleCharacteristic = null;
-const UART_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
-const UART_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
-const BLE_CHUNK_SIZE = 20;
-const BLE_CHUNK_DELAY_MS = 20;
-async function connectBLE() {
-    try {
-        bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ services: [UART_SERVICE_UUID] }],
-            optionalServices: [UART_SERVICE_UUID]
-        });
-        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-        const server = await bleDevice.gatt.connect();
-        const service = await server.getPrimaryService(UART_SERVICE_UUID);
-        bleCharacteristic = await service.getCharacteristic(UART_CHAR_UUID);
-        setStatus(true);
-    } catch (error) {
-        console.error(error);
-        alert("Bluetooth connection failed: " + error.message);
-    }
-}
-function setStatus(connected) {
-    const status = document.getElementById('status');
-    status.textContent = connected ? 'BLUETOOTH: CONNECTED' : 'BLUETOOTH: DISCONNECTED';
-    status.className = connected ? 'status connected' : 'status disconnected';
-    document.getElementById('connectBtn').style.display = connected ? 'none' : 'inline-block';
-    document.getElementById('disconnectBtn').style.display = connected ? 'inline-block' : 'none';
-}
-function onDisconnected() {
-    bleCharacteristic = null;
-    bleDevice = null;
-    setStatus(false);
-}
-function disconnectBLE() {
-    if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
-    else onDisconnected();
-}
-async function writeBytes(bytes) {
-    if (!bleCharacteristic) {
-        alert("Connect the HM-10 first.");
-        return false;
-    }
-    for (let i = 0; i < bytes.length; i += BLE_CHUNK_SIZE) {
-        const chunk = bytes.slice(i, i + BLE_CHUNK_SIZE);
-        await bleCharacteristic.writeValueWithoutResponse(chunk);
-        if (i + BLE_CHUNK_SIZE < bytes.length) await new Promise(resolve => setTimeout(resolve, BLE_CHUNK_DELAY_MS));
-    }
-    return true;
-}
-async function sendCommand(command) {
-    const encoder = new TextEncoder();
-    try { await writeBytes(encoder.encode(command)); }
-    catch (error) { console.error(error); alert("Command transfer failed: " + error.message); }
-}
-async function sendCustomFunction() {
-    let expression = document.getElementById('functionInput').value.trim();
-    if (!expression) {
-        alert("Enter a V3 function expression first.");
-        return;
-    }
-    // V3 protocol: '@' starts the function and '\n' compiles/stores it. It does not activate it.
-    const payload = '@' + expression + '\n';
-    const encoder = new TextEncoder();
-    try {
-        await writeBytes(encoder.encode(payload));
-        console.log("V3 custom function stored:", payload);
-    } catch (error) {
-        console.error(error);
-        alert("Custom function transfer failed: " + error.message);
-    }
-}
+let bleDevice=null,bleCharacteristic=null;
+let writeQueue=Promise.resolve();
+let functionTransferActive=false;
+const UART_SERVICE_UUID="0000ffe0-0000-1000-8000-00805f9b34fb";
+const UART_CHAR_UUID="0000ffe1-0000-1000-8000-00805f9b34fb";
+const BLE_CHUNK_SIZE=20, BLE_CHUNK_DELAY_MS=20;
+const controls=['autoBtn','manualBtn','nextBtn','customMoodBtn','sendFunctionBtn'];
+function setControls(){const connected=!!bleCharacteristic;controls.forEach(id=>document.getElementById(id).disabled=!connected||functionTransferActive)}
+function setStatus(connected){const s=document.getElementById('status');s.textContent=connected?'BLUETOOTH: CONNECTED':'BLUETOOTH: DISCONNECTED';s.className=connected?'status connected':'status disconnected';document.getElementById('connectBtn').style.display=connected?'none':'inline-block';document.getElementById('disconnectBtn').style.display=connected?'inline-block':'none';setControls()}
+async function connectBLE(){try{bleDevice=await navigator.bluetooth.requestDevice({filters:[{services:[UART_SERVICE_UUID]}],optionalServices:[UART_SERVICE_UUID]});bleDevice.addEventListener('gattserverdisconnected',onDisconnected);const server=await bleDevice.gatt.connect();const service=await server.getPrimaryService(UART_SERVICE_UUID);bleCharacteristic=await service.getCharacteristic(UART_CHAR_UUID);setStatus(true);document.getElementById('transferStatus').textContent='Connected. Arduino is now in Bluetooth-controlled mode.'}catch(error){console.error(error);alert('Bluetooth connection failed: '+error.message)}}
+function onDisconnected(){bleCharacteristic=null;bleDevice=null;functionTransferActive=false;setStatus(false);document.getElementById('transferStatus').textContent='Disconnected. Arduino will return to Auto mode.'}
+function disconnectBLE(){if(bleDevice&&bleDevice.gatt.connected)bleDevice.gatt.disconnect();else onDisconnected()}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function writeBytes(bytes){if(!bleCharacteristic){alert('Connect the HM-10 first.');return Promise.resolve(false)}writeQueue=writeQueue.then(async()=>{for(let i=0;i<bytes.length;i+=BLE_CHUNK_SIZE){const chunk=bytes.slice(i,i+BLE_CHUNK_SIZE);await bleCharacteristic.writeValueWithoutResponse(chunk);if(i+BLE_CHUNK_SIZE<bytes.length)await sleep(BLE_CHUNK_DELAY_MS)}return true});return writeQueue.catch(error=>{console.error(error);throw error})}
+async function sendCommand(command){if(functionTransferActive)return;try{await writeBytes(new TextEncoder().encode(command));document.getElementById('transferStatus').textContent='Command sent: '+command}catch(error){console.error(error);alert('Command transfer failed: '+error.message)}}
+async function sendCustomFunction(){if(functionTransferActive)return;let expression=document.getElementById('functionInput').value.trim();if(!expression){alert('Enter a V3 function expression first.');return}functionTransferActive=true;setControls();document.getElementById('transferStatus').textContent='Sending custom function... Arduino is receiving function data only.';try{const payload='@'+expression+'\n';await writeBytes(new TextEncoder().encode(payload));document.getElementById('transferStatus').textContent='Custom function received by transfer path. Press Custom Mood to activate it.'}catch(error){console.error(error);alert('Custom function transfer failed: '+error.message)}finally{functionTransferActive=false;setControls()}}
+setStatus(false);
 </script>
 </body>
 </html>
