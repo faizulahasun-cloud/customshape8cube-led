@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include "../FunctionConversion/FunctionConversionEngine.h"
-#include "../LEDs/LEDDefinitions.h"
 
 // Every animation frame has its own FrameXXX.h pipeline stage.
 #include "../Frames/Frame001.h"
@@ -58,7 +57,7 @@
 
 // V2 Animation Engine
 // Data path for every frame:
-// Function Conversion -> LED001..LED512 definitions -> FrameXXX.h -> FrameEngine -> DisplayEngine.
+// Function Conversion -> direct X/Y/Z traversal -> FrameXXX.h -> FrameEngine -> DisplayEngine.
 // Only one 64-byte frame buffer is used at a time.
 namespace V2Animation {
 
@@ -165,16 +164,19 @@ inline bool generateFrame(uint8_t frameIndex) {
   currentFrame = frameIndex % TOTAL_FRAMES;
   frameBegin(currentFrame);
 
-  // Walk LED001..LED512 definitions. Each matching physical LED is handed to
-  // the selected FrameXXX.h file before FrameEngine receives the completed frame.
-  for (uint16_t ledIndex = 0; ledIndex < 512; ++ledIndex) {
-    const V2LEDDefinitions::Definition &led = V2LEDDefinitions::DEFINITIONS[ledIndex];
-    if (evaluateCurrentVoxel(led.x, led.y, led.z)) {
-      frameSetLED(currentFrame, ledIndex + 1);
+  // Traverse the cube directly. This is equivalent to
+  // LED = Z*64 + Y*8 + X + 1, but avoids the 512-entry coordinate table.
+  for (uint8_t Z = 0; Z < 8; ++Z) {
+    for (uint8_t Y = 0; Y < 8; ++Y) {
+      for (uint8_t X = 0; X < 8; ++X) {
+        const uint16_t ledNumber = (uint16_t)Z * 64 + (uint16_t)Y * 8 + X + 1;
+        if (evaluateCurrentVoxel(X, Y, Z)) {
+          frameSetLED(currentFrame, ledNumber);
+        }
+      }
     }
   }
 
-  // The selected FrameXXX.h then passes the same complete frame to FrameEngine.
   frameSubmit(currentFrame);
   return true;
 }
