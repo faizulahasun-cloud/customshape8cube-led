@@ -95,7 +95,7 @@ void loop(){
        bool compiled=V3FunctionConversion::compileFunction();
        bluetoothFunctionValid=compiled;
        if(compiled){
-         blinkAndSetMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+         // Function is compiled and stored only. It does not change the current mood.
        }
      }
    }else if(inChar=='A'){
@@ -106,7 +106,13 @@ void loop(){
      byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;
      blinkAndSetMode(1,nextAnimation);
    }else if(inChar=='C'){
-     // Custom Mood starts the reception of a new function. Activation occurs only after successful compilation.
+     // Custom Mood selects only the custom mood. It does not compile or run a function.
+     blinkAndSetMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+   }else if(inChar=='R'){
+     // Run the currently compiled custom function only when one is valid.
+     if(bluetoothFunctionValid){
+       blinkAndSetMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+     }
    }
  }
 
