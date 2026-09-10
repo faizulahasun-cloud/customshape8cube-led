@@ -35,8 +35,8 @@ inline bool receiveCharacter(char c){
   if(c=='\r')return false;
   if(c==FUNCTION_START){resetReception();return false;}
   if(!functionStarted)return false;
-  if((uint8_t)c<0x20||(uint8_t)c>0x7E){receiveError=true;return false;}
   if(c==FUNCTION_END){functionBuffer[functionLength]='\0';functionComplete=true;functionStarted=false;return true;}
+  if((uint8_t)c<0x20||(uint8_t)c>0x7E){receiveError=true;return false;}
   if(functionLength>=MAX_FUNCTION_LENGTH){receiveError=true;return false;}
   functionBuffer[functionLength++]=c;functionBuffer[functionLength]='\0';return false;
 }
