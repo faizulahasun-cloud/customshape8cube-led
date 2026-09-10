@@ -35,23 +35,20 @@
         <button onclick="sendCommand('A')">Auto (A)</button>
         <button onclick="sendCommand('M')">Manual (M)</button>
         <button class="next" onclick="sendCommand('N')">Next Animation (N)</button>
-        <button class="custom" onclick="sendCommand('C')">Custom Mood</button>
+        <button class="custom" onclick="sendCustomFunction()">Custom Mood (C)</button>
     </div>
     <h3>Custom Function</h3>
     <textarea id="functionInput">(X*3+Y*5+F)%16<8</textarea>
     <p class="note">
-        Enter one V3 mathematical expression. The page sends it as<br>
+        Enter one V3 mathematical expression. Press <b>Custom Mood</b> to send <b>C</b> first, then the function as<br>
         <b>@expression\n</b><br>
-        The function is stored as the last custom animation. It is not activated until you press <b>Custom Mood</b>.
-        X, Y, Z and F are supported, including decimals and the V3 math operators/functions.
+        The function replaces the last successfully converted custom animation. X, Y, Z and F are supported, including decimals and the V3 math operators/functions.
     </p>
-    <div class="buttons">
-        <button class="connect" onclick="sendCustomFunction()">Send Custom Function</button>
-    </div>
 </div>
 <script>
 let bleDevice = null;
 let bleCharacteristic = null;
+let writeQueue = Promise.resolve();
 const UART_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
 const UART_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
 const BLE_CHUNK_SIZE = 20;
@@ -84,26 +81,33 @@ function onDisconnected() {
     bleDevice = null;
     setStatus(false);
 }
-function disconnectBLE() {
+async function disconnectBLE() {
+    if (bleCharacteristic) {
+        try { await sendCommand('A'); } catch (error) { console.error(error); }
+    }
     if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
     else onDisconnected();
 }
+function queueWrite(bytes) {
+    const operation = writeQueue.then(async () => {
+        if (!bleCharacteristic) throw new Error("Connect the HM-10 first.");
+        for (let i = 0; i < bytes.length; i += BLE_CHUNK_SIZE) {
+            const chunk = bytes.slice(i, i + BLE_CHUNK_SIZE);
+            await bleCharacteristic.writeValueWithoutResponse(chunk);
+            if (i + BLE_CHUNK_SIZE < bytes.length) await new Promise(resolve => setTimeout(resolve, BLE_CHUNK_DELAY_MS));
+        }
+        return true;
+    });
+    writeQueue = operation.catch(() => {});
+    return operation;
+}
 async function writeBytes(bytes) {
-    if (!bleCharacteristic) {
-        alert("Connect the HM-10 first.");
-        return false;
-    }
-    for (let i = 0; i < bytes.length; i += BLE_CHUNK_SIZE) {
-        const chunk = bytes.slice(i, i + BLE_CHUNK_SIZE);
-        await bleCharacteristic.writeValueWithoutResponse(chunk);
-        if (i + BLE_CHUNK_SIZE < bytes.length) await new Promise(resolve => setTimeout(resolve, BLE_CHUNK_DELAY_MS));
-    }
-    return true;
+    return queueWrite(bytes);
 }
 async function sendCommand(command) {
     const encoder = new TextEncoder();
-    try { await writeBytes(encoder.encode(command)); }
-    catch (error) { console.error(error); alert("Command transfer failed: " + error.message); }
+    try { return await writeBytes(encoder.encode(command)); }
+    catch (error) { console.error(error); throw error; }
 }
 async function sendCustomFunction() {
     let expression = document.getElementById('functionInput').value.trim();
@@ -114,8 +118,9 @@ async function sendCustomFunction() {
     const payload = '@' + expression + '\n';
     const encoder = new TextEncoder();
     try {
+        await sendCommand('C');
         await writeBytes(encoder.encode(payload));
-        console.log("V3 custom function stored:", payload);
+        console.log("V3 custom function sent after C:", payload);
     } catch (error) {
         console.error(error);
         alert("Custom function transfer failed: " + error.message);
