@@ -47,7 +47,7 @@ CUSTOM 8
 @((Y==(F%8))&&((((Z==6)&&((X>=2)&&(X<=5)))||((Z==4)&&((X>=2)&&(X<=5)))||((Z==1)&&((X>=2)&&(X<=5)))||((X==2)&&((Z>=1)&&(Z<=6)))||((X==5)&&((Z>=1)&&(Z<=6))))))
 
 CUSTOM 9
-@((Y==(F%8))&&((X==5)||(((((Z==6)||(Z==4))||(Z==1))&&((X>=2)&&(X<=5)))||((X==2)&&(Z>=4)))))
+@((Y==(F%8))&&((X==5&&Z>=1&&Z<=6)||((Z==6||Z==4||Z==1)&&X>=2&&X<=5)||(X==2&&Z>=4&&Z<=6)))
 
 Verified design intent:
 - At F=0, digit is on Y=0 FRONT.
@@ -55,4 +55,5 @@ Verified design intent:
 - ...
 - At F=7, digit is on Y=7 BACK.
 - At F=8, motion repeats from Y=0 FRONT.
-- CUSTOM 9 is compressed to stay within the V3 parser bytecode capacity while preserving the 9 shape.
+- CUSTOM 9 is repaired so the right vertical and upper-left stroke stay within Z=1..6, matching the other digit geometry.
+- The repaired CUSTOM 9 requires more than the current V3 parser bytecode capacity; sandbox validation must therefore use the requested increased-capacity parser simulation.
