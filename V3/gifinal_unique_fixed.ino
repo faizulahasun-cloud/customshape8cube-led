@@ -8,17 +8,15 @@ const byte CLOCK_PIN = 13; // PB5 -> SRCLK
 const byte LATCH_PIN = 12; // PB4 -> RCLK
 const byte TOUCH_PIN = 10;
 const byte POT_PIN   = A0;
-const byte BLE_STATE_PIN = 2;
 
 AltSoftSerial bluetooth; // Hardlocked to Pin 8 (RX) and Pin 9 (TX) on ATmega328P
 
 // --- SYSTEM STATE VARIABLES ---
 volatile byte currentCubeMode = 0; // 0 = Auto Mode, 1 = Manual Mode
-volatile bool isBluetoothOverrideActive = false;
 
 unsigned int animationIndex = 0;
 byte frameCounter = 0;
-const unsigned int TOTAL_ANIMATIONS = 37; // 27 imported + 10 unique V3 mechanisms
+const unsigned int TOTAL_ANIMATIONS = 37; // Built-in animations only
 const unsigned int FRAME_TIME = 200;
 const unsigned long AUTO_MODE_CAROUSEL_TIME = 10000UL;
 
@@ -36,15 +34,6 @@ volatile byte activeDisplayBuffer = 0;
 byte drawDisplayBuffer = 1;
 volatile byte brightnessAccumulator[8] = {0,0,0,0,0,0,0,0};
 
-// --- D2 BLE STATE PIN DEBOUNCE TRACKING ---
-bool lastBluetoothConnected = false;
-unsigned long bluetoothStateChangedAt = 0;
-const unsigned long BLE_STATE_DEBOUNCE_TIME = 3000UL; // 3 seconds continuous constraint
-
-// --- SERIAL VECTOR PARSER GLOBAL STATE ---
-byte parseState = 0;
-byte commandHeader = 0;
-
 // --- STRUCTURAL HARDWARE COLUMN MAPPING ---
 struct ColumnMap { byte reg; byte bit; };
 const ColumnMap COLUMN_MAP[64] = {
@@ -59,25 +48,6 @@ const ColumnMap COLUMN_MAP[64] = {
 };
 
 inline byte columnIndex(byte x, byte y) { return (y * 8) + x; }
-
-// --- NON-DESTRUCTIVE NON-BLOCKING VISUAL STATE ACKNOWLEDGMENT ---
-void triggerModeBlinkAcknowledgment() {
-  for (byte z = 0; z < 8; z++) {
-    for (byte r = 0; r < 8; r++) {
-      displayBuffer[drawDisplayBuffer][z][r] = 0xFF;
-    }
-  }
-  for (byte i = 0; i < 3; i++) {
-    noInterrupts();
-    activeDisplayBuffer = drawDisplayBuffer;
-    interrupts();
-    delay(80);
-    noInterrupts();
-    activeDisplayBuffer = (activeDisplayBuffer == 0) ? 1 : 0;
-    interrupts();
-    delay(80);
-  }
-}
 
 void clearCube() {
   for (byte x = 0; x < 8; x++) {
@@ -163,9 +133,8 @@ void startRefreshTimer() {
 }
 
 // --- UNIFORM BUILT-IN ANIMATION ARCHITECTURE ---
-// All built-in animations use the same interface: animation number + frame + x/y/z.
-// Animations 0-26 are imported from LED_Cube_SMODE_512BIT_3BYTE_FIXED.ino.
-// Animations 27-36 retain V3 mechanisms that are not duplicates of the imported set.
+// Built-in animations only. No Bluetooth custom-function/script generator.
+// Bluetooth controls only: A = Auto, M = Manual, N = Next animation.
 
 inline bool isOuterRing(byte x, byte y) {
   return x == 0 || x == 7 || y == 0 || y == 7;
@@ -424,7 +393,7 @@ void drawAnimationFrame(unsigned int animation, byte frame) {
 
 void setup() {
   pinMode(DATA_PIN, OUTPUT); pinMode(CLOCK_PIN, OUTPUT); pinMode(LATCH_PIN, OUTPUT);
-  pinMode(TOUCH_PIN, INPUT); pinMode(BLE_STATE_PIN, INPUT);
+  pinMode(TOUCH_PIN, INPUT);
   PORTB &= ~(_BV(PB3) | _BV(PB4) | _BV(PB5));
   
   bluetooth.begin(9600);
@@ -436,36 +405,16 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // --- ARDUINO PHYSICAL D2 CONNECTION PIN DEBOUNCER ---
-  bool currentBLESignal = (digitalRead(BLE_STATE_PIN) == HIGH);
-  if (currentBLESignal != lastBluetoothConnected) {
-    if (bluetoothStateChangedAt == 0) { bluetoothStateChangedAt = now; }
-    else if (now - bluetoothStateChangedAt >= BLE_STATE_DEBOUNCE_TIME) {
-      lastBluetoothConnected = currentBLESignal;
-      bluetoothStateChangedAt = 0;
-      if (!lastBluetoothConnected) { // Edge-triggered connection termination drop
-        isBluetoothOverrideActive = false;
-        currentCubeMode = 0; // Absolute safety fallback to Auto carousel
-        animationStart = now;
-        lastFrameTime = now;
-        triggerModeBlinkAcknowledgment();
-      }
-    }
-  } else { bluetoothStateChangedAt = 0; }
-
   // --- HARDWARE ANALOG POTENTIOMETER BACKUP READ LINK ---
-  if (!isBluetoothOverrideActive) {
-    int rawPot = analogRead(POT_PIN);
-    globalBrightness = map(rawPot, 0, 1023, 2, 8);
-  }
+  int rawPot = analogRead(POT_PIN);
+  globalBrightness = map(rawPot, 0, 1023, 2, 8);
 
-  // --- HARDWARE TTP223 TOUCHPAD CONTROL BACKUP INTERFACE ---
+  // --- HARDWARE TTP223 TOUCHPAD CONTROL ---
   static bool lastTouchState = false;
   static unsigned long touchDebounceTimer = 0;
   static bool hasTriggeredLongPress = false;
   
   bool currentTouchState = (digitalRead(TOUCH_PIN) == HIGH);
-  if (lastBluetoothConnected) currentTouchState = false; // Completely muted when over-the-air BLE session is active
 
   if (currentTouchState && !lastTouchState) {
     touchDebounceTimer = now; hasTriggeredLongPress = false;
@@ -473,59 +422,52 @@ void loop() {
     unsigned long touchDuration = now - touchDebounceTimer;
     if (!hasTriggeredLongPress && touchDuration >= 3000UL) { // 3s Long press toggle
       currentCubeMode = (currentCubeMode == 0) ? 1 : 0;
-      isBluetoothOverrideActive = false;
-      triggerModeBlinkAcknowledgment();
       hasTriggeredLongPress = true;
       animationStart = now; lastFrameTime = now;
     }
   } else if (!currentTouchState && lastTouchState) {
     unsigned long touchDuration = now - touchDebounceTimer;
     if (!hasTriggeredLongPress && currentCubeMode == 1 && touchDuration >= 50 && touchDuration < 3000UL) {
-      isBluetoothOverrideActive = false;
       animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS;
-      frameCounter = 0; animationStart = now; lastFrameTime = now;
+      frameCounter = 0; lastFrameTime = now;
       drawAnimationFrame(animationIndex, frameCounter); prepareDisplayData(); commitFrame();
     }
   }
   lastTouchState = currentTouchState;
 
-  // --- NON-BLOCKING TWO-BYTE SERIAL PACKET INTERPRETER ENGINE ---
+  // --- BLUETOOTH CONTROL ---
+  // Bluetooth is deliberately limited to three commands:
+  // A = Auto Mode, M = Manual Mode, N = Next Animation.
+  // No connection-state handling, handshake, acknowledgment, script, or
+  // custom-function generation is performed here.
   while (bluetooth.available() > 0) {
     byte inByte = bluetooth.read();
-    if (parseState == 0) {
-      if (inByte == 'A') { // Auto Mode Trigger Token
-        currentCubeMode = 0; isBluetoothOverrideActive = true;
-        animationStart = now; lastFrameTime = now;
-        triggerModeBlinkAcknowledgment();
-      }
-      else if (inByte == 'M') { // Manual Mode Trigger Token
-        currentCubeMode = 1; isBluetoothOverrideActive = true;
-        animationStart = now; lastFrameTime = now;
-        triggerModeBlinkAcknowledgment();
-      }
-      else if (inByte == 'N' && currentCubeMode == 1) { // Next Pattern Vector Switch
-        animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS;
-        frameCounter = 0; lastFrameTime = now;
-        drawAnimationFrame(animationIndex, frameCounter); prepareDisplayData(); commitFrame();
-      }
-      else if (inByte == 'Q') { // Pre-disconnect quit signal token
-        isBluetoothOverrideActive = false; currentCubeMode = 0;
-        animationStart = now; lastFrameTime = now;
-        triggerModeBlinkAcknowledgment();
-      }
-      else if (inByte == 'B') { commandHeader = inByte; parseState = 4; }
+
+    if (inByte == 'A') {
+      currentCubeMode = 0;
+      animationStart = now;
+      lastFrameTime = now;
     }
-    else if (parseState == 4) { // Brightness numerical byte route
-      if (inByte >= 2 && inByte <= 8) { globalBrightness = inByte; }
-      parseState = 0;
+    else if (inByte == 'M') {
+      currentCubeMode = 1;
+      animationStart = now;
+      lastFrameTime = now;
+    }
+    else if (inByte == 'N' && currentCubeMode == 1) {
+      animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS;
+      frameCounter = 0;
+      lastFrameTime = now;
+      drawAnimationFrame(animationIndex, frameCounter); prepareDisplayData(); commitFrame();
     }
   }
 
-  // --- DYNAMIC RENDERING TIMELINE ROUTINES ---
-  if (currentCubeMode == 0) { // Auto Carousel Playback loop
+  // --- BUILT-IN ANIMATION TIMELINE ---
+  if (currentCubeMode == 0) { // Auto Carousel Playback
     if (now - animationStart >= AUTO_MODE_CAROUSEL_TIME) {
       animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS;
-      frameCounter = 0; animationStart = now; lastFrameTime = now;
+      frameCounter = 0;
+      animationStart = now;
+      lastFrameTime = now;
     }
     if (now - lastFrameTime >= FRAME_TIME) {
       lastFrameTime = now;
@@ -533,7 +475,7 @@ void loop() {
       frameCounter = (frameCounter + 1) % 50;
     }
   }
-  else if (currentCubeMode == 1) { // Manual Mode Continuous Playback loop
+  else if (currentCubeMode == 1) { // Manual Mode Continuous Playback
     if (now - lastFrameTime >= FRAME_TIME) {
       lastFrameTime = now;
       drawAnimationFrame(animationIndex, frameCounter); prepareDisplayData(); commitFrame();
