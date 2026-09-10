@@ -17,6 +17,10 @@
 //   byte = Z*8 + Y
 //   bit  = X
 //   64 bytes = 512 LEDs
+//
+// The frame format is already identical to the DisplayEngine's final
+// 8-layer x 8-register display buffer, so submit() passes the 64-byte frame
+// directly. No second X/Y/Z traversal is required.
 
 namespace V2FrameEngine {
 
@@ -63,12 +67,10 @@ inline const uint8_t *data() {
   return frameData;
 }
 
+// frameData is already in the DisplayEngine's physical 64-byte format.
+// Submit it directly; do not reconstruct 512 voxels through a callback.
 inline void submit() {
-  V2DisplayEngine::buildFrame(
-    [](uint8_t X, uint8_t Y, uint8_t Z) -> bool {
-      return V2FrameEngine::getVoxel(X, Y, Z);
-    }
-  );
+  V2DisplayEngine::submitFrame(frameData);
 }
 
 } // namespace V2FrameEngine
