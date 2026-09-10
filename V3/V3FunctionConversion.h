@@ -9,7 +9,7 @@
 namespace V3FunctionConversion {
 
 static const uint16_t MAX_FUNCTION_LENGTH = 192;
-static const uint8_t MAX_BYTECODE_LENGTH = 80;
+static const uint8_t MAX_BYTECODE_LENGTH = 56;
 static const char FUNCTION_START='@';
 static const char FUNCTION_END='\n';
 
@@ -86,11 +86,10 @@ inline bool parseLogicalAnd(){if(!parseComparison())return false;while(true){ski
 inline bool parseExpression(){if(!parseLogicalAnd())return false;while(true){skipSpaces();if(parsePosition+1<functionLength&&functionBuffer[parsePosition]=='|'&&functionBuffer[parsePosition+1]=='|'){parsePosition+=2;if(!parseLogicalAnd()||!emit(OP_OR))return false;}else return true;}}
 
 inline bool compileFunction(){
-  Instruction backup[MAX_BYTECODE_LENGTH];uint8_t oldLength=bytecodeLength;bool oldValid=functionValid;
-  memcpy(backup,bytecode,sizeof(bytecode));functionValid=false;bytecodeLength=0;parsePosition=0;parseError=receiveError;
-  if(!functionComplete||functionLength==0||receiveError){memcpy(bytecode,backup,sizeof(bytecode));bytecodeLength=oldLength;functionValid=oldValid;return false;}
-  if(!parseExpression()){memcpy(bytecode,backup,sizeof(bytecode));bytecodeLength=oldLength;functionValid=oldValid;return false;}
-  skipSpaces();if(parsePosition!=functionLength||!emit(OP_END)){memcpy(bytecode,backup,sizeof(bytecode));bytecodeLength=oldLength;functionValid=oldValid;return false;}
+  functionValid=false;bytecodeLength=0;parsePosition=0;parseError=receiveError;
+  if(!functionComplete||functionLength==0||receiveError)return false;
+  if(!parseExpression())return false;
+  skipSpaces();if(parsePosition!=functionLength||!emit(OP_END)){bytecodeLength=0;return false;}
   functionValid=true;return true;
 }
 
