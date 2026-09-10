@@ -77,12 +77,14 @@ bool animationVoxel(byte a,byte f,byte x,byte y,byte z){
 }
 void drawAnimationFrame(unsigned int animation,byte frame){if(animation>=TOTAL_ANIMATIONS)return;clearCube();for(byte z=0;z<8;z++)for(byte y=0;y<8;y++)for(byte x=0;x<8;x++)if(animationVoxel(animation,frame,x,y,z))setVoxel(x,y,z,true);}
 
+void blinkAndSetMode(byte targetMode,unsigned int targetAnimation){clearCube();prepareDisplayData();commitFrame();delay(120);currentCubeMode=targetMode;animationIndex=targetAnimation;frameCounter=0;animationStart=millis();lastFrameTime=animationStart;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();}
+
 void setup(){pinMode(DATA_PIN,OUTPUT);pinMode(CLOCK_PIN,OUTPUT);pinMode(LATCH_PIN,OUTPUT);pinMode(TOUCH_PIN,INPUT);PORTB&=~(_BV(PB3)|_BV(PB4)|_BV(PB5));bluetooth.begin(9600);startRefreshTimer();animationStart=millis();lastFrameTime=millis();}
 
 void loop(){
  unsigned long now=millis(); int rawPot=analogRead(POT_PIN); globalBrightness=map(rawPot,0,1023,2,8);
  static bool lastTouchState=false; static unsigned long touchDebounceTimer=0; static bool hasTriggeredLongPress=false; bool currentTouchState=(digitalRead(TOUCH_PIN)==HIGH);
- if(currentTouchState&&!lastTouchState){touchDebounceTimer=now;hasTriggeredLongPress=false;}else if(currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&touchDuration>=3000UL){currentCubeMode=(currentCubeMode==0)?1:0;hasTriggeredLongPress=true;animationStart=now;lastFrameTime=now;}}else if(!currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&currentCubeMode==1&&touchDuration>=50&&touchDuration<3000UL){animationIndex=(animationIndex+1)%BUILTIN_ANIMATIONS;frameCounter=0;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();}}
+ if(currentTouchState&&!lastTouchState){touchDebounceTimer=now;hasTriggeredLongPress=false;}else if(currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&touchDuration>=3000UL){byte targetMode=(currentCubeMode==0)?1:0;blinkAndSetMode(targetMode,animationIndex%BUILTIN_ANIMATIONS);hasTriggeredLongPress=true;}}else if(!currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&currentCubeMode==1&&touchDuration>=50&&touchDuration<3000UL){animationIndex=(animationIndex+1)%BUILTIN_ANIMATIONS;frameCounter=0;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();}}
  lastTouchState=currentTouchState;
 
  while(bluetooth.available()>0){
@@ -94,16 +96,14 @@ void loop(){
        if(V3FunctionConversion::compileFunction()) bluetoothFunctionValid=true;
      }
    }else if(inChar=='A'){
-     currentCubeMode=0;animationIndex=animationIndex%BUILTIN_ANIMATIONS;animationStart=now;lastFrameTime=now;
+     blinkAndSetMode(0,animationIndex%BUILTIN_ANIMATIONS);
    }else if(inChar=='M'){
-     currentCubeMode=1;animationIndex=animationIndex%BUILTIN_ANIMATIONS;animationStart=now;lastFrameTime=now;
+     blinkAndSetMode(1,animationIndex%BUILTIN_ANIMATIONS);
    }else if(inChar=='N'&&currentCubeMode==1){
      animationIndex=(animationIndex+1)%BUILTIN_ANIMATIONS;frameCounter=0;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();
    }else if(inChar=='C'){
      // Custom Mood: activate the last successfully compiled Bluetooth function.
-     if(bluetoothFunctionValid){
-       currentCubeMode=1;animationIndex=BLUETOOTH_FUNCTION_ANIMATION;frameCounter=0;animationStart=now;lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();
-     }
+     if(bluetoothFunctionValid)blinkAndSetMode(1,BLUETOOTH_FUNCTION_ANIMATION);
    }
  }
 
