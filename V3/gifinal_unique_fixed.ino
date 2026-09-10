@@ -16,7 +16,7 @@ unsigned long lastFrameTime=0; unsigned long animationStart=0;
 bool bluetoothFunctionValid=false;
 
 volatile byte globalBrightness=5;
-volatile byte voxelBuffer[2][8][8][8]; volatile byte activeBuffer=0; byte drawBuffer=1;
+volatile byte voxelBuffer[2][8][8]; volatile byte activeBuffer=0; byte drawBuffer=1;
 volatile byte displayBuffer[2][8][8]; volatile byte activeDisplayBuffer=0; byte drawDisplayBuffer=1;
 volatile byte brightnessAccumulator[8]={0,0,0,0,0,0,0,0};
 
@@ -32,10 +32,10 @@ const ColumnMap COLUMN_MAP[64]={
  {8,0},{8,1},{8,2},{8,3},{8,4},{8,5},{8,6},{8,7}
 };
 inline byte columnIndex(byte x,byte y){return (y*8)+x;}
-void clearCube(){for(byte x=0;x<8;x++)for(byte y=0;y<8;y++)for(byte z=0;z<8;z++)voxelBuffer[drawBuffer][x][y][z]=0;}
-inline void setVoxel(byte x,byte y,byte z,bool state){if(x>=8||y>=8||z>=8)return;voxelBuffer[drawBuffer][x][y][z]=state?1:0;}
+void clearCube(){for(byte x=0;x<8;x++)for(byte y=0;y<8;y++)voxelBuffer[drawBuffer][x][y]=0;}
+inline void setVoxel(byte x,byte y,byte z,bool state){if(x>=8||y>=8||z>=8)return;if(state)voxelBuffer[drawBuffer][x][y]|=(1<<z);else voxelBuffer[drawBuffer][x][y]&=~(1<<z);}
 void commitFrame(){noInterrupts();byte oldActive=activeBuffer;activeBuffer=drawBuffer;drawBuffer=oldActive;byte oldDisplay=activeDisplayBuffer;activeDisplayBuffer=drawDisplayBuffer;drawDisplayBuffer=oldDisplay;interrupts();}
-void prepareDisplayData(){byte voxelBuf=drawBuffer;byte outBuf=drawDisplayBuffer;byte localMatrix[8][8];for(byte z=0;z<8;z++){for(byte r=0;r<8;r++)localMatrix[z][r]=0;for(byte y=0;y<8;y++)for(byte x=0;x<8;x++){if(!voxelBuffer[voxelBuf][x][y][z])continue;byte column=columnIndex(x,y);byte reg=COLUMN_MAP[column].reg;byte bit=COLUMN_MAP[column].bit;if(reg>=1&&reg<=8&&bit<=7)localMatrix[z][reg-1]|=(1<<bit);}}noInterrupts();memcpy((void*)displayBuffer[outBuf],localMatrix,64);interrupts();}
+void prepareDisplayData(){byte voxelBuf=drawBuffer;byte outBuf=drawDisplayBuffer;byte localMatrix[8][8];for(byte z=0;z<8;z++){for(byte r=0;r<8;r++)localMatrix[z][r]=0;for(byte y=0;y<8;y++)for(byte x=0;x<8;x++){if(!(voxelBuffer[voxelBuf][x][y]&(1<<z)))continue;byte column=columnIndex(x,y);byte reg=COLUMN_MAP[column].reg;byte bit=COLUMN_MAP[column].bit;if(reg>=1&&reg<=8&&bit<=7)localMatrix[z][reg-1]|=(1<<bit);}}noInterrupts();memcpy((void*)displayBuffer[outBuf],localMatrix,64);interrupts();}
 inline void shiftByteFast(byte value){for(int8_t bit=7;bit>=0;bit--){if(value&(1<<bit))PORTB|=_BV(PB3);else PORTB&=~_BV(PB3);PORTB|=_BV(PB5);PORTB&=~_BV(PB5);}}
 inline void latchFast(){PORTB|=_BV(PB4);PORTB&=~_BV(PB4);}
 void refreshDisplay(){static byte layer=0;byte active=activeDisplayBuffer;brightnessAccumulator[layer]+=globalBrightness;bool layerEnabled=(brightnessAccumulator[layer]>=8);if(layerEnabled)brightnessAccumulator[layer]-=8;byte layerByte=layerEnabled?(1<<layer):0x00;shiftByteFast(layerByte);for(int8_t r=7;r>=0;r--)shiftByteFast(displayBuffer[active][layer][r]);latchFast();layer=(layer+1)%8;}
