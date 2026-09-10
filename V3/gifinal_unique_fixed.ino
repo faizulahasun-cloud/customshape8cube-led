@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <avr/interrupt.h>
 #include <AltSoftSerial.h>
+#include "V3FunctionConversion.h"
 
 // --- HARDWARE PIN DEFINITIONS ---
 const byte DATA_PIN  = 11; // PB3 -> SER
@@ -16,12 +17,14 @@ volatile byte currentCubeMode = 0; // 0 = Auto Mode, 1 = Manual Mode
 
 unsigned int animationIndex = 0;
 byte frameCounter = 0;
-const unsigned int TOTAL_ANIMATIONS = 37; // Built-in animations only
+const unsigned int TOTAL_ANIMATIONS = 38; // 0-36 built-in, 37 Bluetooth function
+const unsigned int BLUETOOTH_FUNCTION_ANIMATION = 37;
 const unsigned int FRAME_TIME = 200;
 const unsigned long AUTO_MODE_CAROUSEL_TIME = 10000UL;
 
 unsigned long lastFrameTime = 0;
 unsigned long animationStart = 0;
+bool bluetoothFunctionValid = false;
 
 // --- VOLATILE MULTIPLEX DISPLAY BUFFER STORAGE ---
 volatile byte globalBrightness = 5; // Valid steps 2 to 8
@@ -133,8 +136,8 @@ void startRefreshTimer() {
 }
 
 // --- UNIFORM BUILT-IN ANIMATION ARCHITECTURE ---
-// Built-in animations only. No Bluetooth custom-function/script generator.
-// Bluetooth controls only: A = Auto, M = Manual, N = Next animation.
+// Built-in animations 0-36 plus one Bluetooth-defined function at 37.
+// Bluetooth controls: A = Auto, M = Manual, N = Next animation, @...\n = function definition.
 
 inline bool isOuterRing(byte x, byte y) {
   return x == 0 || x == 7 || y == 0 || y == 7;
@@ -176,9 +179,7 @@ void snakePosition(byte step, byte &sx, byte &sy, byte &sz) {
     else if (d == 4) pz++;
     else pz--;
   }
-  sx = (byte)px;
-  sy = (byte)py;
-  sz = (byte)pz;
+  sx = (byte)px; sy = (byte)py; sz = (byte)pz;
 }
 bool snakeVoxel(byte f, byte x, byte y, byte z) {
   for (byte k = 0; k < 8; k++) {
@@ -194,34 +195,21 @@ const byte HEART_MASK[8] = { 0x66, 0xFF, 0xFF, 0x7E, 0x3C, 0x18, 0x18, 0x00 };
 bool rotatingHeartVoxel(byte f, byte x, byte y, byte z) {
   if (y != 0 && y != 1) return false;
   byte r = (f / 4) % 4, u, v;
-  if (r == 0) {
-    u = x;
-    v = z;
-  } else if (r == 1) {
-    u = z;
-    v = 7 - x;
-  } else if (r == 2) {
-    u = 7 - x;
-    v = 7 - z;
-  } else {
-    u = 7 - z;
-    v = x;
-  }
+  if (r == 0) { u = x; v = z; }
+  else if (r == 1) { u = z; v = 7 - x; }
+  else if (r == 2) { u = 7 - x; v = 7 - z; }
+  else { u = 7 - z; v = x; }
   return (HEART_MASK[v] & (1 << u)) != 0;
 }
 
 bool v3DirectionalSweepVoxel(byte f, byte x, byte y, byte z) {
   byte targetX = (f + 0) % 16;
-  if (0 % 2 == 0) {
-    return (x == (targetX < 8 ? targetX : 15 - targetX));
-  }
+  if (0 % 2 == 0) return (x == (targetX < 8 ? targetX : 15 - targetX));
   return (x == (targetX < 8 ? 7 - targetX : targetX - 8));
 }
 bool v3SphereVoxel(byte f, byte x, byte y, byte z) {
   int cx = 3, cy = 3, cz = 3;
-  int dx = (int)x - cx;
-  int dy = (int)y - cy;
-  int dz = (int)z - cz;
+  int dx = (int)x - cx, dy = (int)y - cy, dz = (int)z - cz;
   int distSq = dx*dx + dy*dy + dz*dz;
   int radiusMatch = 1 + (f % 5);
   return (distSq >= radiusMatch * radiusMatch && distSq < (radiusMatch + 1) * (radiusMatch + 1));
@@ -251,12 +239,8 @@ bool v3MatrixRainVoxel(byte f, byte x, byte y, byte z) {
   return (z == dropZ);
 }
 bool v3WireCubeVoxel(byte f, byte x, byte y, byte z) {
-  byte size = f % 4;
-  byte lo = 3 - size;
-  byte hi = 4 + size;
-  bool edgeX = (x == lo || x == hi);
-  bool edgeY = (y == lo || y == hi);
-  bool edgeZ = (z == lo || z == hi);
+  byte size = f % 4, lo = 3 - size, hi = 4 + size;
+  bool edgeX = (x == lo || x == hi), edgeY = (y == lo || y == hi), edgeZ = (z == lo || z == hi);
   return (edgeX && edgeY) || (edgeY && edgeZ) || (edgeX && edgeZ);
 }
 bool v3PlasmaVoxel(byte f, byte x, byte y, byte z) {
@@ -269,9 +253,13 @@ bool v3CurtainVoxel(byte f, byte x, byte y, byte z) {
   return (((x + y + 0) % 8) == (f % 8)) || (((y + z + 0) % 8) == ((7 - f) % 8));
 }
 bool v3HelixOrbitalVoxel(byte f, byte x, byte y, byte z) {
-  byte h1 = (f + 0) % 8;
-  byte h2 = (7 - f + 0) % 8;
+  byte h1 = (f + 0) % 8, h2 = (7 - f + 0) % 8;
   return (z == h1 && x == y) || (z == h2 && x == (7 - y));
+}
+
+inline bool bluetoothFunctionVoxel(byte f, byte x, byte y, byte z) {
+  if (!bluetoothFunctionValid) return false;
+  return V3FunctionConversion::evaluate(x, y, z, f);
 }
 
 bool animationVoxel(byte a, byte f, byte x, byte y, byte z) {
@@ -282,90 +270,23 @@ bool animationVoxel(byte a, byte f, byte x, byte y, byte z) {
   if (a == 4) return x == y && y == z && x == (f % 8);
   if (a == 5) return x == y && z == (7 - x) && x == (f % 8);
   if (a == 6) return ((x + y + z + f) & 1) == 0;
-  if (a == 7) {
-    byte r = f % 5;
-    int d = max(abs((int)x - 3), max(abs((int)y - 3), abs((int)z - 3)));
-    return d == r;
-  }
-  if (a == 8) {
-    byte r = 4 - (f % 5);
-    int d = max(abs((int)x - 3), max(abs((int)y - 3), abs((int)z - 3)));
-    return d == r;
-  }
-  if (a == 9) {
-    if (!(x == 3 || x == 4 || y == 3 || y == 4 || z == 3 || z == 4)) return false;
-    return ((x + y + z + f) & 1) == 0;
-  }
-  if (a == 10) {
-    byte w = (x + y + f) % 8;
-    return z == w || z == ((w + 1) % 8);
-  }
-  if (a == 11) {
-    byte ss = (f / 2) % 8;
-    if (ss == 0) return x == 0;
-    if (ss == 1) return y == 7;
-    if (ss == 2) return x == 7;
-    return y == 0;
-  }
-  if (a == 12) {
-    if (!isOuterRing(x, y)) return false;
-    byte p = perimeterIndex(x, y);
-    return ((p + f) % 28) < 3;
-  }
-  if (a == 13) {
-    if (!isOuterRing(x, y)) return false;
-    byte p = perimeterIndex(x, y);
-    return z == ((p + f) % 8);
-  }
-  if (a == 14) {
-    byte h = (x * 3 + y * 5 + f) % 16;
-    if (h >= 8) return false;
-    byte rz = 7 - h;
-    return z == rz || (rz < 7 && z == rz + 1);
-  }
-  if (a == 15) {
-    int dx = abs((int)x - 3), dy = abs((int)y - 3);
-    if (dx <= 1 && dy <= 1) {
-      if (z > ((f / 2) % 8)) return false;
-      return ((x + y + f) & 1) != 0;
-    }
-    return false;
-  }
-  if (a == 16) {
-    if (!isOuterRing(x, y)) return false;
-    byte p = perimeterIndex(x, y), o = (p + f) % 28;
-    return z == (o % 8) || z == ((o + 1) % 8);
-  }
-  if (a == 17) {
-    if (!isOuterRing(x, y)) return false;
-    byte p = perimeterIndex(x, y);
-    return z == ((p + f) % 8);
-  }
-  if (a == 18) {
-    byte r = f % 8;
-    int d = abs((int)x - 3) + abs((int)y - 3) + abs((int)z - 3);
-    return d == r || d == r + 1;
-  }
-  if (a == 19) {
-    byte r = f % 10;
-    int d = min(abs((int)x - 3), abs((int)x - 4)) + min(abs((int)y - 3), abs((int)y - 4)) + min(abs((int)z - 3), abs((int)z - 4));
-    return d == r || d == r + 1;
-  }
-  if (a == 20) {
-    byte r = 9 - (f % 10);
-    int d = min(abs((int)x - 3), abs((int)x - 4)) + min(abs((int)y - 3), abs((int)y - 4)) + min(abs((int)z - 3), abs((int)z - 4));
-    return d == r || d == r + 1;
-  }
-  if (a == 21) {
-    int d = abs((int)x - 3) + abs((int)y - 3) + abs((int)z - 3);
-    return ((d + f) % 4) < 2;
-  }
+  if (a == 7) { byte r = f % 5; int d = max(abs((int)x - 3), max(abs((int)y - 3), abs((int)z - 3))); return d == r; }
+  if (a == 8) { byte r = 4 - (f % 5); int d = max(abs((int)x - 3), max(abs((int)y - 3), abs((int)z - 3))); return d == r; }
+  if (a == 9) { if (!(x == 3 || x == 4 || y == 3 || y == 4 || z == 3 || z == 4)) return false; return ((x + y + z + f) & 1) == 0; }
+  if (a == 10) { byte w = (x + y + f) % 8; return z == w || z == ((w + 1) % 8); }
+  if (a == 11) { byte ss = (f / 2) % 8; if (ss == 0) return x == 0; if (ss == 1) return y == 7; if (ss == 2) return x == 7; return y == 0; }
+  if (a == 12) { if (!isOuterRing(x, y)) return false; byte p = perimeterIndex(x, y); return ((p + f) % 28) < 3; }
+  if (a == 13) { if (!isOuterRing(x, y)) return false; byte p = perimeterIndex(x, y); return z == ((p + f) % 8); }
+  if (a == 14) { byte h = (x * 3 + y * 5 + f) % 16; if (h >= 8) return false; byte rz = 7 - h; return z == rz || (rz < 7 && z == rz + 1); }
+  if (a == 15) { int dx = abs((int)x - 3), dy = abs((int)y - 3); if (dx <= 1 && dy <= 1) { if (z > ((f / 2) % 8)) return false; return ((x + y + f) & 1) != 0; } return false; }
+  if (a == 16) { if (!isOuterRing(x, y)) return false; byte p = perimeterIndex(x, y), o = (p + f) % 28; return z == (o % 8) || z == ((o + 1) % 8); }
+  if (a == 17) { if (!isOuterRing(x, y)) return false; byte p = perimeterIndex(x, y); return z == ((p + f) % 8); }
+  if (a == 18) { byte r = f % 8; int d = abs((int)x - 3) + abs((int)y - 3) + abs((int)z - 3); return d == r || d == r + 1; }
+  if (a == 19) { byte r = f % 10; int d = min(abs((int)x - 3), abs((int)x - 4)) + min(abs((int)y - 3), abs((int)y - 4)) + min(abs((int)z - 3), abs((int)z - 4)); return d == r || d == r + 1; }
+  if (a == 20) { byte r = 9 - (f % 10); int d = min(abs((int)x - 3), abs((int)x - 4)) + min(abs((int)y - 3), abs((int)y - 4)) + min(abs((int)z - 3), abs((int)z - 4)); return d == r || d == r + 1; }
+  if (a == 21) { int d = abs((int)x - 3) + abs((int)y - 3) + abs((int)z - 3); return ((d + f) % 4) < 2; }
   if (a == 22) return ((x + y + z + f) % 8) == 0;
-  if (a == 23) {
-    if (!((x == 0 || x == 7) && (y == 0 || y == 7) && (z == 0 || z == 7))) return false;
-    byte c = ((z == 7) ? 4 : 0) + ((y == 7) ? 2 : 0) + ((x == 7) ? 1 : 0);
-    return c == (f % 8);
-  }
+  if (a == 23) { if (!((x == 0 || x == 7) && (y == 0 || y == 7) && (z == 0 || z == 7))) return false; byte c = ((z == 7) ? 4 : 0) + ((y == 7) ? 2 : 0) + ((x == 7) ? 1 : 0); return c == (f % 8); }
   if (a == 24) return firecrackerVoxel(f, x, y, z);
   if (a == 25) return snakeVoxel(f, x, y, z);
   if (a == 26) return rotatingHeartVoxel(f, x, y, z);
@@ -379,6 +300,7 @@ bool animationVoxel(byte a, byte f, byte x, byte y, byte z) {
   if (a == 34) return v3PlasmaVoxel(f, x, y, z);
   if (a == 35) return v3CurtainVoxel(f, x, y, z);
   if (a == 36) return v3HelixOrbitalVoxel(f, x, y, z);
+  if (a == BLUETOOTH_FUNCTION_ANIMATION) return bluetoothFunctionVoxel(f, x, y, z);
   return false;
 }
 
@@ -398,7 +320,6 @@ void setup() {
   pinMode(DATA_PIN, OUTPUT); pinMode(CLOCK_PIN, OUTPUT); pinMode(LATCH_PIN, OUTPUT);
   pinMode(TOUCH_PIN, INPUT);
   PORTB &= ~(_BV(PB3) | _BV(PB4) | _BV(PB5));
-  
   bluetooth.begin(9600);
   startRefreshTimer();
   animationStart = millis();
@@ -416,7 +337,6 @@ void loop() {
   static bool lastTouchState = false;
   static unsigned long touchDebounceTimer = 0;
   static bool hasTriggeredLongPress = false;
-  
   bool currentTouchState = (digitalRead(TOUCH_PIN) == HIGH);
 
   if (currentTouchState && !lastTouchState) {
@@ -439,32 +359,48 @@ void loop() {
   lastTouchState = currentTouchState;
 
   // --- BLUETOOTH CONTROL ---
-  // Bluetooth is deliberately limited to three commands:
   // A = Auto Mode, M = Manual Mode, N = Next Animation.
-  // No connection-state handling, handshake, acknowledgment, script, or
-  // custom-function generation is performed here.
+  // @ starts a function definition; newline completes it.
+  // The cube never receives streamed LED frames.
   while (bluetooth.available() > 0) {
-    byte inByte = bluetooth.read();
+    char inChar = (char)bluetooth.read();
 
-    if (inByte == 'A') {
+    if (inChar == 'A') {
       currentCubeMode = 0;
       animationStart = now;
       lastFrameTime = now;
     }
-    else if (inByte == 'M') {
+    else if (inChar == 'M') {
       currentCubeMode = 1;
       animationStart = now;
       lastFrameTime = now;
     }
-    else if (inByte == 'N' && currentCubeMode == 1) {
+    else if (inChar == 'N' && currentCubeMode == 1 && !V3FunctionConversion::isFunctionStarted()) {
       animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS;
       frameCounter = 0;
       lastFrameTime = now;
       drawAnimationFrame(animationIndex, frameCounter); prepareDisplayData(); commitFrame();
     }
+    else if (inChar == '@' || V3FunctionConversion::isFunctionStarted()) {
+      bool complete = V3FunctionConversion::receiveCharacter(inChar);
+      if (complete) {
+        if (V3FunctionConversion::compileFunction()) {
+          bluetoothFunctionValid = true;
+          animationIndex = BLUETOOTH_FUNCTION_ANIMATION;
+          frameCounter = 0;
+          animationStart = now;
+          lastFrameTime = now;
+          drawAnimationFrame(animationIndex, frameCounter);
+          prepareDisplayData();
+          commitFrame();
+        } else {
+          bluetoothFunctionValid = V3FunctionConversion::isFunctionValid();
+        }
+      }
+    }
   }
 
-  // --- BUILT-IN ANIMATION TIMELINE ---
+  // --- ANIMATION TIMELINE ---
   if (currentCubeMode == 0) {
     if (now - animationStart >= AUTO_MODE_CAROUSEL_TIME) {
       animationIndex = (animationIndex + 1) % TOTAL_ANIMATIONS;
