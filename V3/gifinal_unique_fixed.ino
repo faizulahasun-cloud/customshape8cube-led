@@ -115,7 +115,8 @@ void loop(){
      if(complete){
        bool compiled=V3FunctionConversion::compileFunction();
        bluetoothFunctionValid=compiled;
-       if(compiled)setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+       // Compilation is deliberately separate from execution. The browser's
+       // Run Animation button sends R when the user wants the function to run.
      }
    }else if(inChar=='A'){
      setMode(0,animationIndex%BUILTIN_ANIMATIONS);
@@ -125,9 +126,11 @@ void loop(){
      byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;
      setMode(1,nextAnimation);
    }else if(inChar=='C'){
-     // Custom Mood blanks the cube and arms the custom-function animation.
+     // Custom Mood only selects Custom mode and blanks the previous mood.
+     // It does not compile or execute a function.
      setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
    }else if(inChar=='R'){
+     // Run Animation is the only command that starts the compiled function.
      if(bluetoothFunctionValid)setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
    }
  }
