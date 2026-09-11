@@ -1,8 +1,0 @@
-CUSTOM
-D=X-3.5
-E=Y-3.5
-R=D*D+E*E
-W=(F%16)
-IF R>W OFF
-Z=F%8
-END

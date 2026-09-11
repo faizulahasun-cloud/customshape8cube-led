@@ -1,6 +1,0 @@
-CUSTOM
-P=X+Y+Z
-Q=(F%16)
-IF P<Q OFF
-IF P>Q+1 OFF
-END

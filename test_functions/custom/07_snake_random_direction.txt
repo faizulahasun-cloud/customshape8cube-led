@@ -1,7 +1,0 @@
-CUSTOM
-CY=3.5+2.2*sin((F*7)%31+X*0.9)
-CZ=3.5+2.0*cos(((F*7)%31)*0.7+X*0.6)
-DY=Y-CY
-DZ=Z-CZ
-IF DY*DY+DZ*DZ>1.5 OFF
-END

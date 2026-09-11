@@ -1,6 +1,0 @@
-CUSTOM
-H=(X+Y+F)%16
-IF H>=8 OFF
-RZ=7-H
-Z=RZ
-END
