@@ -46,9 +46,9 @@
     <h3>Custom Function</h3>
     <textarea id="functionInput">(X*3+Y*5+F)%16<8</textarea>
     <p class="note">
-        <b>Custom Mood</b> sends <b>C</b> and only changes the cube to Custom mode.<br>
-        <b>Send Function</b> sends <b>@expression\n</b> and only compiles/stores the function.<br>
-        <b>Run Animation</b> sends <b>R</b> and only starts the already compiled custom function.<br>
+        <b>Custom Mood</b> sends the single character <b>C</b> and blanks/stops the cube.<br>
+        <b>Send Function</b> sends <b>@expressionE</b>. <b>@</b> starts reception and <b>E</b> ends reception. No newline is sent and E does not compile the function.<br>
+        <b>Run Animation</b> sends the single character <b>R</b>. R compiles the stored function and starts it only if compilation succeeds.<br>
         Maximum function length: 92 characters. Maximum compiled bytecode: 56 instructions.
     </p>
     <div class="buttons">
@@ -182,7 +182,7 @@ async function sendFunction() {
         return;
     }
     const encoder = new TextEncoder();
-    const payload = '@' + expression + '\n';
+    const payload = '@' + expression + 'E';
     try {
         const ok = await writeBytes(encoder.encode(payload));
         if (!ok) return;
