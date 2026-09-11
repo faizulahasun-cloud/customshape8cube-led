@@ -42,11 +42,18 @@ void refreshDisplay(){static byte layer=0;byte active=activeDisplayBuffer;bright
 ISR(TIMER2_COMPA_vect){refreshDisplay();}
 void startRefreshTimer(){noInterrupts();TCCR2A=_BV(WGM21);TCCR2B=_BV(CS22)|_BV(CS21)|_BV(CS20);OCR2A=15;TIMSK2|=_BV(OCIE2A);interrupts();}
 void stopRefreshTimer(){noInterrupts();TIMSK2&=~_BV(OCIE2A);interrupts();}
+
+// Full cube clear: stop multiplexing first, clear the complete 512-voxel state
+// and both frame/display buffers, then shift nine zero bytes (8 column registers
+// plus the layer register) and latch. No multiplexing restarts until a new
+// operation explicitly starts a mode.
 void blankCubeAndStop(){
  stopRefreshTimer();
- clearCube();
- prepareDisplayData();
- commitFrame();
+ noInterrupts();
+ memset((void*)voxelBuffer,0,sizeof(voxelBuffer));
+ memset((void*)displayBuffer,0,sizeof(displayBuffer));
+ for(byte i=0;i<8;i++)brightnessAccumulator[i]=0;
+ interrupts();
  shiftByteFast(0x00);
  for(byte r=0;r<8;r++)shiftByteFast(0x00);
  latchFast();
@@ -94,10 +101,10 @@ void setMode(byte targetMode,unsigned int targetAnimation){
  frameCounter=0;
  animationStart=millis();
  lastFrameTime=animationStart;
- startRefreshTimer();
  drawAnimationFrame(animationIndex,frameCounter);
  prepareDisplayData();
  commitFrame();
+ startRefreshTimer();
 }
 
 void setup(){pinMode(DATA_PIN,OUTPUT);pinMode(CLOCK_PIN,OUTPUT);pinMode(LATCH_PIN,OUTPUT);pinMode(TOUCH_PIN,INPUT);PORTB&=~(_BV(PB3)|_BV(PB4)|_BV(PB5));bluetooth.begin(9600);startRefreshTimer();animationStart=millis();lastFrameTime=millis();}
@@ -117,11 +124,18 @@ void loop(){
 
  while(bluetooth.available()>0){
    char inChar=(char)bluetooth.read();
-   if(inChar=='@'||V3FunctionConversion::isFunctionStarted()){
-     bool complete=V3FunctionConversion::receiveCharacter(inChar);
-     if(complete){
-       bluetoothFunctionValid=false;
-     }
+   if(inChar=='@'){
+     // Function start is itself an operation: hard-stop multiplexing and clear all 512 states.
+     blankCubeAndStop();
+     currentCubeMode=1;
+     animationIndex=BLUETOOTH_FUNCTION_ANIMATION;
+     frameCounter=0;
+     animationStart=millis();
+     lastFrameTime=animationStart;
+     V3FunctionConversion::receiveCharacter(inChar);
+   }else if(V3FunctionConversion::isFunctionStarted()){
+     // Every byte after @ is function data until E. No newline is involved.
+     V3FunctionConversion::receiveCharacter(inChar);
    }else if(inChar=='A'){
      setMode(0,animationIndex%BUILTIN_ANIMATIONS);
    }else if(inChar=='M'){
@@ -130,6 +144,7 @@ void loop(){
      byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;
      setMode(1,nextAnimation);
    }else if(inChar=='C'){
+     // Custom selection: clear the full voxel state and WAIT with multiplexing stopped.
      bluetoothFunctionValid=false;
      blankCubeAndStop();
      currentCubeMode=1;
@@ -138,9 +153,22 @@ void loop(){
      animationStart=millis();
      lastFrameTime=animationStart;
    }else if(inChar=='R'){
+     // R is the only command that compiles and starts the stored function.
+     // Stop/blank first even if compilation fails.
+     blankCubeAndStop();
      if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
        bluetoothFunctionValid=true;
-       setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+       currentCubeMode=1;
+       animationIndex=BLUETOOTH_FUNCTION_ANIMATION;
+       frameCounter=0;
+       animationStart=millis();
+       lastFrameTime=animationStart;
+       drawAnimationFrame(animationIndex,frameCounter);
+       prepareDisplayData();
+       commitFrame();
+       startRefreshTimer();
+     }else{
+       bluetoothFunctionValid=false;
      }
    }
  }
