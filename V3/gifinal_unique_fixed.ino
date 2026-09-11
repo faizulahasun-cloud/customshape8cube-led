@@ -124,18 +124,22 @@ void loop(){
 
  while(bluetooth.available()>0){
    char inChar=(char)bluetooth.read();
+
+   // Bluetooth protocol ownership:
+   // A/M/N/C/R are commands. @ starts SRAM reception. E stops SRAM reception.
+   // @ and E are never passed to the expression parser.
    if(inChar=='@'){
-     // Function start is itself an operation: hard-stop multiplexing and clear all 512 states.
+     // Start receiving a new function. This is an operation: hard-stop and clear first.
      blankCubeAndStop();
      currentCubeMode=1;
      animationIndex=BLUETOOTH_FUNCTION_ANIMATION;
      frameCounter=0;
      animationStart=millis();
      lastFrameTime=animationStart;
-     V3FunctionConversion::receiveCharacter(inChar);
-   }else if(V3FunctionConversion::isFunctionStarted()){
-     // Every byte after @ is function data until E. No newline is involved.
-     V3FunctionConversion::receiveCharacter(inChar);
+     V3FunctionConversion::startReception();
+   }else if(inChar=='E'){
+     // E is only the receiver STOP button. It is not function data and is not parsed.
+     V3FunctionConversion::stopReception();
    }else if(inChar=='A'){
      setMode(0,animationIndex%BUILTIN_ANIMATIONS);
    }else if(inChar=='M'){
@@ -170,6 +174,9 @@ void loop(){
      }else{
        bluetoothFunctionValid=false;
      }
+   }else if(V3FunctionConversion::isFunctionStarted()){
+     // Receiver is ON: every other received printable character is saved in SRAM.
+     V3FunctionConversion::receiveCharacter(inChar);
    }
  }
 
