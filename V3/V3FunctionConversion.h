@@ -11,8 +11,8 @@
 // The engine never drives the cube or allocates LED frame buffers.
 namespace V3FunctionConversion {
 
-static const uint16_t MAX_FUNCTION_LENGTH = 92;
-static const uint8_t MAX_BYTECODE_LENGTH = 56;
+static const uint16_t MAX_FUNCTION_LENGTH = 192;
+static const uint8_t MAX_BYTECODE_LENGTH = 80;
 
 enum OpCode:uint8_t{OP_END=0,OP_CONST,OP_X,OP_Y,OP_Z,OP_F,OP_ADD,OP_SUB,OP_MUL,OP_DIV,OP_MOD,OP_NEG,OP_SIN,OP_COS,OP_SQRT,OP_ABS,OP_NOT,OP_LT,OP_LE,OP_GT,OP_GE,OP_EQ,OP_NE,OP_AND,OP_OR};
 struct Instruction{uint8_t op;float value;};
