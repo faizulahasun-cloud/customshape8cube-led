@@ -35,12 +35,12 @@ inline byte columnIndex(byte x,byte y){return (y*8)+x;}
 void clearCube(){for(byte x=0;x<8;x++)for(byte y=0;y<8;y++)voxelBuffer[drawBuffer][x][y]=0;}
 inline void setVoxel(byte x,byte y,byte z,bool state){if(x>=8||y>=8||z>=8)return;if(state)voxelBuffer[drawBuffer][x][y]|=(1<<z);else voxelBuffer[drawBuffer][x][y]&=~(1<<z);}
 void commitFrame(){noInterrupts();byte oldActive=activeBuffer;activeBuffer=drawBuffer;drawBuffer=oldActive;byte oldDisplay=activeDisplayBuffer;activeDisplayBuffer=drawDisplayBuffer;drawDisplayBuffer=oldDisplay;interrupts();}
-void prepareDisplayData(){byte voxelBuf=drawBuffer;byte outBuf=drawDisplayBuffer;byte localMatrix[8][8];for(byte z=0;z<8;z++){for(byte r=0;r<8;r++)localMatrix[z][r]=0;for(byte y=0;y<8;y++)for(byte x=0;x<8;x++){if(!(voxelBuffer[voxelBuf][x][y]&(1<<z)))continue;byte column=columnIndex(x,y);byte reg=COLUMN_MAP[column].reg;byte bit=COLUMN_MAP[column].bit;if(reg>=1&&reg<=8&&bit<=7)localMatrix[z][reg-1]|=(1<<bit);}}noInterrupts();memcpy((void*)displayBuffer[outBuf],localMatrix,64);interrupts();}
+void prepareDisplayData(){byte voxelBuf=drawBuffer;byte outBuf=drawDisplayBuffer;byte localMatrix[8][8];for(byte z=0;z<8;z++){for(byte r=0;r<8;r++)localMatrix[z][r]=0;for(byte y=0;y<8;y++)for(byte x=0;x<8;x++){if(!(voxelBuffer[voxelBuf][x][y]&(1<<z)))continue;byte column=columnIndex(x,y);byte reg=COLUMN_MAP[column].reg;byte bit=COLUMN_MAP[column].bit;if(reg>=1&&reg<=8&&bit<=7)localMatrix[z][reg-1]|=(1<<bit);}}memcpy((void*)displayBuffer[outBuf],localMatrix,64);}
 inline void shiftByteFast(byte value){for(int8_t bit=7;bit>=0;bit--){if(value&(1<<bit))PORTB|=_BV(PB3);else PORTB&=~_BV(PB3);PORTB|=_BV(PB5);PORTB&=~_BV(PB5);}}
 inline void latchFast(){PORTB|=_BV(PB4);PORTB&=~_BV(PB4);}
 void refreshDisplay(){static byte layer=0;byte active=activeDisplayBuffer;brightnessAccumulator[layer]+=globalBrightness;bool layerEnabled=(brightnessAccumulator[layer]>=8);if(layerEnabled)brightnessAccumulator[layer]-=8;byte layerByte=layerEnabled?(1<<layer):0x00;shiftByteFast(layerByte);for(int8_t r=7;r>=0;r--)shiftByteFast(displayBuffer[active][layer][r]);latchFast();layer=(layer+1)%8;}
 ISR(TIMER2_COMPA_vect){refreshDisplay();}
-void startRefreshTimer(){noInterrupts();TCCR2A=_BV(WGM21);TCCR2B=_BV(CS22)|_BV(CS21)|_BV(CS20);OCR2A=3;TIMSK2|=_BV(OCIE2A);interrupts();}
+void startRefreshTimer(){noInterrupts();TCCR2A=_BV(WGM21);TCCR2B=_BV(CS22)|_BV(CS21)|_BV(CS20);OCR2A=15;TIMSK2|=_BV(OCIE2A);interrupts();}
 
 inline bool isOuterRing(byte x,byte y){return x==0||x==7||y==0||y==7;}
 byte perimeterIndex(byte x,byte y){if(y==0)return x;if(x==7)return 7+y;if(y==7)return 21-x;return 21+(7-y);}
