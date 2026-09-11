@@ -55,6 +55,7 @@
         <button class="send" id="sendFunctionBtn" onclick="sendFunction()" disabled>Send Function</button>
         <button class="run" id="runAnimationBtn" onclick="runAnimation()" disabled>Run Animation</button>
     </div>
+    <div id="functionTransferStatus" class="status" style="display:none"></div>
 </div>
 
 <script>
@@ -77,6 +78,7 @@ function updateCustomControls() {
 function resetCustomState() {
     customModeSelected = false;
     functionTransferSucceeded = false;
+    document.getElementById('functionTransferStatus').style.display = 'none';
     updateCustomControls();
 }
 
@@ -167,6 +169,7 @@ async function enterCustomMood() {
     if (!ok) return;
     customModeSelected = true;
     functionTransferSucceeded = false;
+    document.getElementById('functionTransferStatus').style.display = 'none';
     updateCustomControls();
 }
 
@@ -187,10 +190,14 @@ async function sendFunction() {
         const ok = await writeBytes(encoder.encode(payload));
         if (!ok) return;
         functionTransferSucceeded = true;
+        document.getElementById('functionTransferStatus').textContent = 'Function transmission complete';
+        document.getElementById('functionTransferStatus').className = 'status connected';
+        document.getElementById('functionTransferStatus').style.display = 'block';
         updateCustomControls();
         console.log("V3 custom function sent:", payload);
     } catch (error) {
         functionTransferSucceeded = false;
+        document.getElementById('functionTransferStatus').style.display = 'none';
         updateCustomControls();
         console.error(error);
         alert("Custom function transfer failed: " + error.message);
