@@ -1,188 +1,207 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>8x8x8 LED Cube Console - Custom Function Studio</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e24; color: #f4f4f9; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: #2a2a35; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        h1, h3 { color: #00d2ff; }
-        .status-panel { padding: 15px; border-radius: 6px; font-weight: bold; margin-bottom: 20px; text-align: center; font-size: 1.1em; }
-        .disconnected { background-color: #721c24; color: #f8d7da; border: 1px solid #f5c6cb; }
-        .connected { background-color: #155724; color: #d4edda; border: 1px solid #c3e6cb; }
-        .btn-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-        button { background-color: #008cba; color: white; border: none; padding: 12px 20px; text-align: center; font-size: 14px; border-radius: 6px; cursor: pointer; transition: all 0.3s ease; font-weight: bold; }
-        button:hover { background-color: #005f73; transform: translateY(-2px); }
-        button.connect-btn { background-color: #28a745; }
-        button.connect-btn:hover { background-color: #218838; }
-        button.disconnect-btn { background-color: #dc3545; }
-        button.disconnect-btn:hover { background-color: #c82333; }
-        button.action-btn { background-color: #ffc107; color: #212529; }
-        button.action-btn:hover { background-color: #e0a96d; }
-        textarea { width: 100%; height: 180px; background-color: #111; color: #39ff14; font-family: 'Courier New', Courier, monospace; font-size: 14px; padding: 10px; border: 1px solid #444; border-radius: 6px; box-sizing: border-box; resize: vertical; }
-        .brightness-panel { display: flex; align-items: center; gap: 15px; margin: 20px 0; background: #343446; padding: 15px; border-radius: 6px; }
-        input[type="range"] { flex-grow: 1; accent-color: #00d2ff; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>8x8x8 LED Cube — V3</title>
+<style>
+    body { font-family: Arial, sans-serif; background:#1e1e24; color:#f4f4f9; padding:20px; }
+    .container { max-width:760px; margin:auto; background:#2a2a35; padding:25px; border-radius:12px; }
+    h1,h3 { color:#00d2ff; }
+    .status { padding:12px; margin-bottom:18px; border-radius:6px; text-align:center; font-weight:bold; }
+    .disconnected { background:#721c24; color:#f8d7da; }
+    .connected { background:#155724; color:#d4edda; }
+    .buttons { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
+    button { border:0; border-radius:6px; padding:12px 18px; font-weight:bold; cursor:pointer; background:#008cba; color:white; }
+    button:hover { background:#005f73; }
+    button:disabled { opacity:0.45; cursor:not-allowed; }
+    .connect { background:#28a745; }
+    .disconnect { background:#dc3545; }
+    .next { background:#ffc107; color:#212529; }
+    .custom { background:#9b59b6; }
+    .send { background:#17a2b8; }
+    .run { background:#e67e22; }
+    textarea { width:100%; height:170px; box-sizing:border-box; resize:vertical; background:#111; color:#39ff14; border:1px solid #444; border-radius:6px; padding:10px; font-family:monospace; font-size:14px; }
+    .note { color:#bbb; font-size:13px; line-height:1.5; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>8x8x8 LED Cube Console</h1>
-        
-        <div id="statusLabel" class="status-panel disconnected">
-            INTERFACE STATUS: DISCONNECTED
-        </div>
+<div class="container">
+    <h1>8x8x8 LED Cube — V3</h1>
+    <div id="status" class="status disconnected">BLUETOOTH: DISCONNECTED</div>
 
-        <div class="btn-group">
-            <button class="connect-btn" id="connectBtn" onclick="connectBLE()">Pair HM-10 BLE Module</button>
-            <button class="disconnect-btn" id="disconnectBtn" onclick="disconnectBLE()" style="display:none;">Disconnect Session</button>
-        </div>
-
-        <h3>System Controls</h3>
-        <div class="btn-group">
-            <button onclick="sendCommand('A')">Auto Mode ('A')</button>
-            <button onclick="sendCommand('M')">Manual Mode ('M')</button>
-            <button class="action-btn" onclick="sendCommand('N')">Next Animation ('N')</button>
-        </div>
-
-        <div class="brightness-panel">
-            <label for="brightnessRange"><strong>BRIGHTNESS CONTROL:</strong></label>
-            <input type="range" id="brightnessRange" min="2" max="8" value="5" onchange="updateBrightness(this.value)">
-            <span id="brightnessVal">5</span>
-        </div>
-
-        <h3>Custom Function Engine f(x,y,z,f)</h3>
-        <div style="margin-bottom: 15px;">
-            <textarea id="formulaInput" placeholder="// Custom Math Studio Rules:&#10;// Write code line by line. Use variables or logic conditions.&#10;// End the program with a VOXEL expression statement.&#10;R = sqrt((X-3.5)*(X-3.5) + (Y-3.5)*(Y-3.5))&#10;VOXEL sin(R - F*0.5) > 0.2"></textarea>
-        </div>
-        <div class="btn-group">
-            <button class="connect-btn" onclick="uploadCustomFormula()">Compile Custom Upload & Start</button>
-            <button class="disconnect-btn" onclick="sendCommand('S')">Stop Custom</button>
-        </div>
+    <div class="buttons">
+        <button class="connect" id="connectBtn" onclick="connectBLE()">Connect HM-10</button>
+        <button class="disconnect" id="disconnectBtn" onclick="disconnectBLE()" style="display:none">Disconnect</button>
     </div>
 
-    <script>
-        let bleDevice = null;
-        let bleCharacteristic = null;
+    <h3>Cube Controls</h3>
+    <div class="buttons">
+        <button onclick="sendModeCommand('A')">Auto (A)</button>
+        <button onclick="sendModeCommand('M')">Manual (M)</button>
+        <button class="next" onclick="sendModeCommand('N')">Next Animation (N)</button>
+        <button class="custom" id="customMoodBtn" onclick="enterCustomMood()">Custom Mood (C)</button>
+    </div>
 
-        // Custom standard HM-10 BLE SPP UUID sets
-        const UART_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
-        const UART_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
+    <h3>Custom Function</h3>
+    <textarea id="functionInput">(X*3+Y*5+F)%16<8</textarea>
+    <p class="note">
+        <b>Custom Mood</b> sends the single character <b>C</b> and blanks/stops the cube.<br>
+        <b>Send Function</b> sends <b>@expressionE</b>. <b>@</b> starts reception and <b>E</b> ends reception. No newline is sent and E does not compile the function.<br>
+        <b>Run Animation</b> sends the single character <b>R</b>. R compiles the stored function and starts it only if compilation succeeds.<br>
+        Maximum function length: 192 characters. Maximum compiled bytecode: 80 instructions.
+    </p>
+    <div class="buttons">
+        <button class="send" id="sendFunctionBtn" onclick="sendFunction()" disabled>Send Function</button>
+        <button class="run" id="runAnimationBtn" onclick="runAnimation()" disabled>Run Animation</button>
+    </div>
+</div>
 
-        async function connectBLE() {
-            try {
-                console.log("Requesting bluetooth device mapping...");
-                bleDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [UART_SERVICE_UUID] }],
-                    optionalServices: [UART_SERVICE_UUID]
-                });
+<script>
+let bleDevice = null;
+let bleCharacteristic = null;
+let writeQueue = Promise.resolve();
+let customModeSelected = false;
+let functionTransferSucceeded = false;
 
-                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+const UART_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
+const UART_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
+const BLE_CHUNK_SIZE = 20;
+const BLE_CHUNK_DELAY_MS = 20;
 
-                console.log("Connecting to GATT server infrastructure...");
-                const server = await bleDevice.gatt.connect();
+function updateCustomControls() {
+    document.getElementById('sendFunctionBtn').disabled = !customModeSelected || !bleCharacteristic;
+    document.getElementById('runAnimationBtn').disabled = !customModeSelected || !bleCharacteristic || !functionTransferSucceeded;
+}
 
-                console.log("Locating layout primary link services...");
-                const service = await server.getPrimaryService(UART_SERVICE_UUID);
-                bleCharacteristic = await service.getCharacteristic(UART_CHAR_UUID);
+function resetCustomState() {
+    customModeSelected = false;
+    functionTransferSucceeded = false;
+    updateCustomControls();
+}
 
-                document.getElementById("statusLabel").innerText = "INTERFACE STATUS: CONNECTED";
-                document.getElementById("statusLabel").className = "status-panel connected";
-                document.getElementById("connectBtn").style.display = "none";
-                document.getElementById("disconnectBtn").style.display = "inline-block";
-                
-                // Fire verification handshake sequence
-                setTimeout(() => { sendCommand('H'); }, 600);
+async function connectBLE() {
+    try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ services: [UART_SERVICE_UUID] }],
+            optionalServices: [UART_SERVICE_UUID]
+        });
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService(UART_SERVICE_UUID);
+        bleCharacteristic = await service.getCharacteristic(UART_CHAR_UUID);
+        setStatus(true);
+        resetCustomState();
+    } catch (error) {
+        console.error(error);
+        alert("Bluetooth connection failed: " + error.message);
+    }
+}
 
-            } catch (error) {
-                console.error("BLE Setup Failure: ", error);
-                alert("Pairing link could not be negotiated: " + error.message);
+function setStatus(connected) {
+    const status = document.getElementById('status');
+    status.textContent = connected ? 'BLUETOOTH: CONNECTED' : 'BLUETOOTH: DISCONNECTED';
+    status.className = connected ? 'status connected' : 'status disconnected';
+    document.getElementById('connectBtn').style.display = connected ? 'none' : 'inline-block';
+    document.getElementById('disconnectBtn').style.display = connected ? 'inline-block' : 'none';
+    updateCustomControls();
+}
+
+function onDisconnected() {
+    bleCharacteristic = null;
+    bleDevice = null;
+    resetCustomState();
+    setStatus(false);
+}
+
+async function disconnectBLE() {
+    if (bleCharacteristic) {
+        try { await sendCommand('A'); } catch (error) { console.error(error); }
+    }
+    if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+    else onDisconnected();
+}
+
+function queueWrite(bytes) {
+    const operation = writeQueue.then(async () => {
+        if (!bleCharacteristic) throw new Error("Connect the HM-10 first.");
+        for (let i = 0; i < bytes.length; i += BLE_CHUNK_SIZE) {
+            const chunk = bytes.slice(i, i + BLE_CHUNK_SIZE);
+            await bleCharacteristic.writeValueWithoutResponse(chunk);
+            if (i + BLE_CHUNK_SIZE < bytes.length) {
+                await new Promise(resolve => setTimeout(resolve, BLE_CHUNK_DELAY_MS));
             }
         }
+        return true;
+    });
+    writeQueue = operation.catch(() => {});
+    return operation;
+}
 
-        function onDisconnected() {
-            document.getElementById("statusLabel").innerText = "INTERFACE STATUS: DISCONNECTED";
-            document.getElementById("statusLabel").className = "status-panel disconnected";
-            document.getElementById("connectBtn").style.display = "inline-block";
-            document.getElementById("disconnectBtn").style.display = "none";
-            bleCharacteristic = null;
-            bleDevice = null;
-        }
+function writeBytes(bytes) {
+    return queueWrite(bytes);
+}
 
-        function disconnectBLE() {
-            if (bleDevice && bleDevice.gatt.connected) {
-                bleDevice.gatt.disconnect();
-            }
-        }
+async function sendCommand(command) {
+    const encoder = new TextEncoder();
+    try {
+        return await writeBytes(encoder.encode(command));
+    } catch (error) {
+        console.error(error);
+        alert("Command transfer failed: " + error.message);
+        return false;
+    }
+}
 
-        async function sendCommand(charCmd) {
-            if (!bleCharacteristic) {
-                alert("Hardware channel unreachable. Pair Bluetooth first!");
-                return;
-            }
-            try {
-                const encoder = new TextEncoder();
-                await bleCharacteristic.writeValueWithoutResponse(encoder.encode(charCmd));
-                console.log(`Executed operational instruction flag: ${charCmd}`);
-            } catch (error) {
-                console.error("Command Transfer Fault: ", error);
-            }
-        }
+async function sendModeCommand(command) {
+    const ok = await sendCommand(command);
+    if (ok) resetCustomState();
+}
 
-        async function updateBrightness(val) {
-            document.getElementById("brightnessVal").innerText = val;
-            if (!bleCharacteristic) return;
-            try {
-                const buffer = new Uint8Array([66, parseInt(val)]); // 'B' = 66 ASCII character code byte
-                await bleCharacteristic.writeValueWithoutResponse(buffer);
-                console.log(`Dispatched revised global intensity tier: ${val}`);
-            } catch (error) {
-                console.error("Failed to apply target brightness: ", error);
-            }
-        }
+async function enterCustomMood() {
+    if (!bleCharacteristic) {
+        alert("Connect the HM-10 first.");
+        return;
+    }
+    const ok = await sendCommand('C');
+    if (!ok) return;
+    customModeSelected = true;
+    functionTransferSucceeded = false;
+    updateCustomControls();
+}
 
-        async function uploadCustomFormula() {
-            if (!bleCharacteristic) {
-                alert("Please attach to a valid module before sending formulas.");
-                return;
-            }
+async function sendFunction() {
+    if (!customModeSelected) return;
+    const expression = document.getElementById('functionInput').value.trim();
+    if (!expression) {
+        alert("Enter a V3 function expression first.");
+        return;
+    }
+    if (expression.length > 192) {
+        alert("Function is too long. Maximum is 192 characters.");
+        return;
+    }
+    const encoder = new TextEncoder();
+    const payload = '@' + expression + 'E';
+    try {
+        const ok = await writeBytes(encoder.encode(payload));
+        if (!ok) return;
+        functionTransferSucceeded = true;
+        updateCustomControls();
+        console.log("V3 custom function sent:", payload);
+    } catch (error) {
+        functionTransferSucceeded = false;
+        updateCustomControls();
+        console.error(error);
+        alert("Custom function transfer failed: " + error.message);
+    }
+}
 
-            let text = document.getElementById("formulaInput").value.trim();
-            if(!text) {
-                alert("Please write a custom formula expression context first.");
-                return;
-            }
-
-            // Prep full dynamic command context wrapper stream package payload
-            let packageData = "CF_BEGIN\n" + text + "\nCF_END\n";
-            let encoder = new TextEncoder();
-            let byteData = encoder.encode(packageData);
-
-            try {
-                // Initialize transaction trigger
-                await sendCommand('C');
-                // Allow hardware window buffer tracking time to setup clean vectors
-                await new Promise(r => setTimeout(r, 400)); 
-
-                console.log("Beginning chunk transmission queue loop...");
-                // Break transaction payload into standard BLE ATT MTU blocks of 20 bytes maximum
-                const chunkSize = 20;
-                for (let i = 0; i < byteData.length; i += chunkSize) {
-                    let chunk = byteData.slice(i, i + chunkSize);
-                    await bleCharacteristic.writeValueWithoutResponse(chunk);
-                    // Crucial pipeline delay so micro-controller buffer does not drop frames
-                    await new Promise(r => setTimeout(r, 60)); 
-                }
-                
-                console.log("Transmission complete. Dispatched trigger verification command...");
-                await new Promise(r => setTimeout(r, 500));
-                await sendCommand('X'); // Execute the compiled custom code block instruction flag
-
-            } catch(err) {
-                console.error("Custom calculation string chunk upload failure: ", err);
-                alert("Transmission stream drop error encountered: " + err.message);
-            }
-        }
-    </script>
+async function runAnimation() {
+    if (!customModeSelected || !functionTransferSucceeded) return;
+    const ok = await sendCommand('R');
+    if (ok) console.log("V3 custom animation run command sent.");
+}
+</script>
 </body>
 </html>
