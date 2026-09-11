@@ -40,7 +40,7 @@ inline void shiftByteFast(byte value){for(int8_t bit=7;bit>=0;bit--){if(value&(1
 inline void latchFast(){PORTB|=_BV(PB4);PORTB&=~_BV(PB4);}
 void refreshDisplay(){static byte layer=0;byte active=activeDisplayBuffer;brightnessAccumulator[layer]+=globalBrightness;bool layerEnabled=(brightnessAccumulator[layer]>=8);if(layerEnabled)brightnessAccumulator[layer]-=8;byte layerByte=layerEnabled?(1<<layer):0x00;shiftByteFast(layerByte);for(int8_t r=7;r>=0;r--)shiftByteFast(displayBuffer[active][layer][r]);latchFast();layer=(layer+1)%8;}
 ISR(TIMER2_COMPA_vect){refreshDisplay();}
-void startRefreshTimer(){noInterrupts();TCCR2A=_BV(WGM21);TCCR2B=_BV(CS22)|_BV(CS21)|_BV(CS20);OCR2A=15;TIMSK2|=_BV(OCIE2A);interrupts();}
+void startRefreshTimer(){noInterrupts();TCCR2A=_BV(WGM21);TCCR2B=_BV(CS22)|_BV(CS21)|_BV(CS20);OCR2A=3;TIMSK2|=_BV(OCIE2A);interrupts();}
 void stopRefreshTimer(){noInterrupts();TIMSK2&=~_BV(OCIE2A);interrupts();}
 
 // Full cube clear: stop multiplexing first, clear the complete 512-voxel state
@@ -143,7 +143,7 @@ void loop(){
      animationIndex=BLUETOOTH_FUNCTION_ANIMATION;
      frameCounter=0;
      animationStart=millis();
-     lastFrameTime=animationStart;
+     lastFrameTime=millis();
      V3FunctionConversion::startReception();
    }else if(inChar=='A'){
      setMode(0,animationIndex%BUILTIN_ANIMATIONS);
