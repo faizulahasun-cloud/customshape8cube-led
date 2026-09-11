@@ -37,9 +37,9 @@
 
     <h3>Cube Controls</h3>
     <div class="buttons">
-        <button onclick="sendCommand('A')">Auto (A)</button>
-        <button onclick="sendCommand('M')">Manual (M)</button>
-        <button class="next" onclick="sendCommand('N')">Next Animation (N)</button>
+        <button onclick="sendModeCommand('A')">Auto (A)</button>
+        <button onclick="sendModeCommand('M')">Manual (M)</button>
+        <button class="next" onclick="sendModeCommand('N')">Next Animation (N)</button>
         <button class="custom" id="customMoodBtn" onclick="enterCustomMood()">Custom Mood (C)</button>
     </div>
 
@@ -153,6 +153,11 @@ async function sendCommand(command) {
     }
 }
 
+async function sendModeCommand(command) {
+    const ok = await sendCommand(command);
+    if (ok) resetCustomState();
+}
+
 async function enterCustomMood() {
     if (!bleCharacteristic) {
         alert("Connect the HM-10 first.");
@@ -196,11 +201,6 @@ async function runAnimation() {
     if (!customModeSelected || !functionTransferSucceeded) return;
     const ok = await sendCommand('R');
     if (ok) console.log("V3 custom animation run command sent.");
-}
-
-async function sendModeCommand(command) {
-    const ok = await sendCommand(command);
-    if (ok) resetCustomState();
 }
 </script>
 </body>
