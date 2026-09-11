@@ -67,11 +67,17 @@ inline bool parseNumber(){
   return emit(OP_CONST,value);
 }
 inline char upperAscii(char c){return(c>='a'&&c<='z')?(char)(c-'a'+'A'):c;}
+inline bool isReservedCommandToken(char c){
+  c=upperAscii(c);
+  return c=='A'||c=='M'||c=='N'||c=='C'||c=='E'||c=='R';
+}
 inline bool parseIdentifier(){
   skipSpaces();if(parsePosition>=functionLength)return false;uint16_t start=parsePosition;
   while(parsePosition<functionLength){char c=functionBuffer[parsePosition];if(!((c>='A'&&c<='Z')||(c>='a'&&c<='z')))break;parsePosition++;}
   if(start==parsePosition)return false;uint16_t n=parsePosition-start;
-  if(n==1){char q=upperAscii(functionBuffer[start]);if(q=='X')return emit(OP_X);if(q=='Y')return emit(OP_Y);if(q=='Z')return emit(OP_Z);if(q=='F')return emit(OP_F);}
+  // Only X,Y,Z,F are legal single-letter formula variables. All single-letter
+  // Bluetooth command tokens are explicitly rejected here, never aliased.
+  if(n==1){char q=upperAscii(functionBuffer[start]);if(q=='X')return emit(OP_X);if(q=='Y')return emit(OP_Y);if(q=='Z')return emit(OP_Z);if(q=='F')return emit(OP_F);if(isReservedCommandToken(q)){parseError=true;return false;}parseError=true;return false;}
   if(!matchChar('(')){parseError=true;return false;}if(!parseExpression()||!matchChar(')'))return false;
   char n0=n>0?upperAscii(functionBuffer[start]):0,n1=n>1?upperAscii(functionBuffer[start+1]):0,n2=n>2?upperAscii(functionBuffer[start+2]):0,n3=n>3?upperAscii(functionBuffer[start+3]):0;
   if(n==3&&n0=='S'&&n1=='I'&&n2=='N')return emit(OP_SIN);
