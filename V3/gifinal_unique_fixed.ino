@@ -41,6 +41,16 @@ inline void latchFast(){PORTB|=_BV(PB4);PORTB&=~_BV(PB4);}
 void refreshDisplay(){static byte layer=0;byte active=activeDisplayBuffer;brightnessAccumulator[layer]+=globalBrightness;bool layerEnabled=(brightnessAccumulator[layer]>=8);if(layerEnabled)brightnessAccumulator[layer]-=8;byte layerByte=layerEnabled?(1<<layer):0x00;shiftByteFast(layerByte);for(int8_t r=7;r>=0;r--)shiftByteFast(displayBuffer[active][layer][r]);latchFast();layer=(layer+1)%8;}
 ISR(TIMER2_COMPA_vect){refreshDisplay();}
 void startRefreshTimer(){noInterrupts();TCCR2A=_BV(WGM21);TCCR2B=_BV(CS22)|_BV(CS21)|_BV(CS20);OCR2A=15;TIMSK2|=_BV(OCIE2A);interrupts();}
+void stopRefreshTimer(){noInterrupts();TIMSK2&=~_BV(OCIE2A);interrupts();}
+void blankCubeAndStop(){
+ stopRefreshTimer();
+ clearCube();
+ prepareDisplayData();
+ commitFrame();
+ shiftByteFast(0x00);
+ for(byte r=0;r<8;r++)shiftByteFast(0x00);
+ latchFast();
+}
 
 inline bool isOuterRing(byte x,byte y){return x==0||x==7||y==0||y==7;}
 byte perimeterIndex(byte x,byte y){if(y==0)return x;if(x==7)return 7+y;if(y==7)return 21-x;return 21+(7-y);}
@@ -77,16 +87,14 @@ bool animationVoxel(byte a,byte f,byte x,byte y,byte z){
 }
 void drawAnimationFrame(unsigned int animation,byte frame){if(animation>=TOTAL_ANIMATIONS)return;clearCube();for(byte z=0;z<8;z++)for(byte y=0;y<8;y++)for(byte x=0;x<8;x++)if(animationVoxel(animation,frame,x,y,z))setVoxel(x,y,z,true);}
 
-// Non-blocking mode transition: never stop servicing the AltSoftSerial receiver.
 void setMode(byte targetMode,unsigned int targetAnimation){
- clearCube();
- prepareDisplayData();
- commitFrame();
+ blankCubeAndStop();
  currentCubeMode=targetMode;
  animationIndex=targetAnimation;
  frameCounter=0;
  animationStart=millis();
  lastFrameTime=animationStart;
+ startRefreshTimer();
  drawAnimationFrame(animationIndex,frameCounter);
  prepareDisplayData();
  commitFrame();
@@ -107,16 +115,12 @@ void loop(){
  else if(!currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&currentCubeMode==1&&touchDuration>=50&&touchDuration<3000UL){byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;setMode(1,nextAnimation);}}
  lastTouchState=currentTouchState;
 
- // Drain the complete Bluetooth receive queue before doing animation work.
  while(bluetooth.available()>0){
    char inChar=(char)bluetooth.read();
    if(inChar=='@'||V3FunctionConversion::isFunctionStarted()){
      bool complete=V3FunctionConversion::receiveCharacter(inChar);
      if(complete){
-       bool compiled=V3FunctionConversion::compileFunction();
-       bluetoothFunctionValid=compiled;
-       // Compilation is deliberately separate from execution. The browser's
-       // Run Animation button sends R when the user wants the function to run.
+       bluetoothFunctionValid=false;
      }
    }else if(inChar=='A'){
      setMode(0,animationIndex%BUILTIN_ANIMATIONS);
@@ -126,12 +130,18 @@ void loop(){
      byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;
      setMode(1,nextAnimation);
    }else if(inChar=='C'){
-     // Custom Mood only selects Custom mode and blanks the previous mood.
-     // It does not compile or execute a function.
-     setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+     bluetoothFunctionValid=false;
+     blankCubeAndStop();
+     currentCubeMode=1;
+     animationIndex=BLUETOOTH_FUNCTION_ANIMATION;
+     frameCounter=0;
+     animationStart=millis();
+     lastFrameTime=animationStart;
    }else if(inChar=='R'){
-     // Run Animation is the only command that starts the compiled function.
-     if(bluetoothFunctionValid)setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+     if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
+       bluetoothFunctionValid=true;
+       setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+     }
    }
  }
 
@@ -139,7 +149,9 @@ void loop(){
  if(currentCubeMode==0){
    if(now-animationStart>=AUTO_MODE_CAROUSEL_TIME){animationIndex=(animationIndex+1)%BUILTIN_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;}
    if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
- }else if(currentCubeMode==1){
+ }else if(currentCubeMode==1 && animationIndex==BLUETOOTH_FUNCTION_ANIMATION && bluetoothFunctionValid){
+   if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
+ }else if(currentCubeMode==1 && animationIndex<BUILTIN_ANIMATIONS){
    if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
  }
 }
