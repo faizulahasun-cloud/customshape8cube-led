@@ -20,6 +20,18 @@ volatile byte voxelBuffer[2][8][8]; volatile byte activeBuffer=0; byte drawBuffe
 volatile byte displayBuffer[2][8][8]; volatile byte activeDisplayBuffer=0; byte drawDisplayBuffer=1;
 volatile byte brightnessAccumulator[8]={0,0,0,0,0,0,0,0};
 
+// Non-blocking visible confirmation state. This touches only displayBuffer;
+// functionBuffer, bytecode, voxelBuffer, and animation state are preserved.
+const unsigned long CONFIRMATION_PHASE_MS=250UL;
+const byte CONFIRMATION_NONE=0;
+const byte CONFIRMATION_RECEIVED=1;
+const byte CONFIRMATION_COMPILED=2;
+bool confirmationActive=false;
+byte confirmationType=CONFIRMATION_NONE;
+byte confirmationPhase=0;
+unsigned long confirmationPhaseStart=0;
+bool pendingCompiledConfirmation=false;
+
 struct ColumnMap { byte reg; byte bit; };
 const ColumnMap COLUMN_MAP[64]={
  {1,0},{1,1},{1,2},{1,3},{1,4},{1,5},{1,6},{1,7},
@@ -57,6 +69,61 @@ void blankCubeAndStop(){
  shiftByteFast(0x00);
  for(byte r=0;r<8;r++)shiftByteFast(0x00);
  latchFast();
+}
+
+// Confirmation display uses the existing multiplexing ISR and only replaces
+// displayBuffer contents temporarily. It never calls delay() and never edits
+// the stored function or compiled bytecode.
+void setConfirmationDisplay(bool on){
+ noInterrupts();
+ for(byte b=0;b<2;b++)for(byte layer=0;layer<8;layer++)for(byte r=0;r<8;r++)displayBuffer[b][layer][r]=on?0xFF:0x00;
+ interrupts();
+}
+
+void startConfirmation(byte type){
+ confirmationActive=true;
+ confirmationType=type;
+ confirmationPhase=0;
+ confirmationPhaseStart=millis();
+ pendingCompiledConfirmation=false;
+ // @/R may have stopped multiplexing, so restart the existing Timer2 refresh
+ // without changing its configuration or ISR frequency.
+ startRefreshTimer();
+ setConfirmationDisplay(true);
+}
+
+void finishConfirmation(){
+ byte finishedType=confirmationType;
+ confirmationActive=false;
+ confirmationType=CONFIRMATION_NONE;
+ confirmationPhase=0;
+ setConfirmationDisplay(false);
+ if(finishedType==CONFIRMATION_RECEIVED && pendingCompiledConfirmation){
+   pendingCompiledConfirmation=false;
+   startConfirmation(CONFIRMATION_COMPILED);
+   return;
+ }
+ if(finishedType==CONFIRMATION_COMPILED){
+   currentCubeMode=1;
+   animationIndex=BLUETOOTH_FUNCTION_ANIMATION;
+   frameCounter=0;
+   animationStart=millis();
+   lastFrameTime=millis();
+   drawAnimationFrame(animationIndex,frameCounter);
+   prepareDisplayData();
+   commitFrame();
+ }
+}
+
+void serviceConfirmation(unsigned long now){
+ if(!confirmationActive)return;
+ if(now-confirmationPhaseStart<CONFIRMATION_PHASE_MS)return;
+ confirmationPhaseStart=now;
+ confirmationPhase++;
+ if(confirmationPhase==1)setConfirmationDisplay(false);
+ else if(confirmationPhase==2)setConfirmationDisplay(true);
+ else if(confirmationPhase==3)setConfirmationDisplay(false);
+ else finishConfirmation();
 }
 
 inline bool isOuterRing(byte x,byte y){return x==0||x==7||y==0||y==7;}
@@ -133,6 +200,9 @@ void loop(){
    if(V3FunctionConversion::isFunctionStarted()){
      if(inChar=='E'){
        V3FunctionConversion::stopReception();
+       // Confirmation #1 starts only after stopReception() has completed and
+       // the engine confirms the complete function is stored successfully.
+       if(V3FunctionConversion::isFunctionComplete())startConfirmation(CONFIRMATION_RECEIVED);
      }else{
        V3FunctionConversion::receiveCharacter(inChar);
      }
@@ -163,26 +233,29 @@ void loop(){
      lastFrameTime=millis();
    }else if(inChar=='R'){
      // R is the only command that compiles and starts the stored function.
-     // Stop/blank first even if compilation fails.
-     blankCubeAndStop();
-     if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
-       bluetoothFunctionValid=true;
-       currentCubeMode=1;
-       animationIndex=BLUETOOTH_FUNCTION_ANIMATION;
-       frameCounter=0;
-       animationStart=millis();
-       lastFrameTime=millis();
-       drawAnimationFrame(animationIndex,frameCounter);
-       prepareDisplayData();
-       commitFrame();
-       startRefreshTimer();
+     // If confirmation #1 is still running, compile now and queue confirmation #2
+     // so the two confirmations cannot overlap. Otherwise blank and compile normally.
+     if(confirmationActive){
+       if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
+         bluetoothFunctionValid=true;
+         pendingCompiledConfirmation=true;
+       }
      }else{
-       bluetoothFunctionValid=false;
+       blankCubeAndStop();
+       if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
+         bluetoothFunctionValid=true;
+         startConfirmation(CONFIRMATION_COMPILED);
+       }else{
+         bluetoothFunctionValid=false;
+       }
      }
    }
  }
 
  now=millis();
+ serviceConfirmation(now);
+ if(confirmationActive)return;
+
  if(currentCubeMode==0){
    if(now-animationStart>=AUTO_MODE_CAROUSEL_TIME){animationIndex=(animationIndex+1)%BUILTIN_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;}
    if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
