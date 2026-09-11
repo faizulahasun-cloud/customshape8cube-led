@@ -77,16 +77,37 @@ bool animationVoxel(byte a,byte f,byte x,byte y,byte z){
 }
 void drawAnimationFrame(unsigned int animation,byte frame){if(animation>=TOTAL_ANIMATIONS)return;clearCube();for(byte z=0;z<8;z++)for(byte y=0;y<8;y++)for(byte x=0;x<8;x++)if(animationVoxel(animation,frame,x,y,z))setVoxel(x,y,z,true);}
 
-void blinkAndSetMode(byte targetMode,unsigned int targetAnimation){clearCube();prepareDisplayData();commitFrame();delay(300);currentCubeMode=targetMode;animationIndex=targetAnimation;frameCounter=0;animationStart=millis();lastFrameTime=animationStart;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();}
+// Non-blocking mode transition: never stop servicing the AltSoftSerial receiver.
+void setMode(byte targetMode,unsigned int targetAnimation){
+ clearCube();
+ prepareDisplayData();
+ commitFrame();
+ currentCubeMode=targetMode;
+ animationIndex=targetAnimation;
+ frameCounter=0;
+ animationStart=millis();
+ lastFrameTime=animationStart;
+ drawAnimationFrame(animationIndex,frameCounter);
+ prepareDisplayData();
+ commitFrame();
+}
 
 void setup(){pinMode(DATA_PIN,OUTPUT);pinMode(CLOCK_PIN,OUTPUT);pinMode(LATCH_PIN,OUTPUT);pinMode(TOUCH_PIN,INPUT);PORTB&=~(_BV(PB3)|_BV(PB4)|_BV(PB5));bluetooth.begin(9600);startRefreshTimer();animationStart=millis();lastFrameTime=millis();}
 
 void loop(){
- unsigned long now=millis(); int rawPot=analogRead(POT_PIN); globalBrightness=map(rawPot,0,1023,2,8);
- static bool lastTouchState=false; static unsigned long touchDebounceTimer=0; static bool hasTriggeredLongPress=false; bool currentTouchState=(digitalRead(TOUCH_PIN)==HIGH);
- if(currentTouchState&&!lastTouchState){touchDebounceTimer=now;hasTriggeredLongPress=false;}else if(currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&touchDuration>=3000UL){byte targetMode=(currentCubeMode==0)?1:0;blinkAndSetMode(targetMode,animationIndex%BUILTIN_ANIMATIONS);hasTriggeredLongPress=true;}}else if(!currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&currentCubeMode==1&&touchDuration>=50&&touchDuration<3000UL){byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;blinkAndSetMode(1,nextAnimation);}}
+ unsigned long now=millis();
+ int rawPot=analogRead(POT_PIN);
+ globalBrightness=map(rawPot,0,1023,2,8);
+ static bool lastTouchState=false;
+ static unsigned long touchDebounceTimer=0;
+ static bool hasTriggeredLongPress=false;
+ bool currentTouchState=(digitalRead(TOUCH_PIN)==HIGH);
+ if(currentTouchState&&!lastTouchState){touchDebounceTimer=now;hasTriggeredLongPress=false;}
+ else if(currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&touchDuration>=3000UL){byte targetMode=(currentCubeMode==0)?1:0;setMode(targetMode,animationIndex%BUILTIN_ANIMATIONS);hasTriggeredLongPress=true;}}
+ else if(!currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&currentCubeMode==1&&touchDuration>=50&&touchDuration<3000UL){byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;setMode(1,nextAnimation);}}
  lastTouchState=currentTouchState;
 
+ // Drain the complete Bluetooth receive queue before doing animation work.
  while(bluetooth.available()>0){
    char inChar=(char)bluetooth.read();
    if(inChar=='@'||V3FunctionConversion::isFunctionStarted()){
@@ -94,28 +115,24 @@ void loop(){
      if(complete){
        bool compiled=V3FunctionConversion::compileFunction();
        bluetoothFunctionValid=compiled;
-       if(compiled){
-         // Function is compiled and stored only. It does not change the current mood.
-       }
+       if(compiled)setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
      }
    }else if(inChar=='A'){
-     blinkAndSetMode(0,animationIndex%BUILTIN_ANIMATIONS);
+     setMode(0,animationIndex%BUILTIN_ANIMATIONS);
    }else if(inChar=='M'){
-     blinkAndSetMode(1,animationIndex%BUILTIN_ANIMATIONS);
+     setMode(1,animationIndex%BUILTIN_ANIMATIONS);
    }else if(inChar=='N'&&currentCubeMode==1){
      byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;
-     blinkAndSetMode(1,nextAnimation);
+     setMode(1,nextAnimation);
    }else if(inChar=='C'){
-     // Custom Mood selects only the custom mood. It does not compile or run a function.
-     blinkAndSetMode(1,BLUETOOTH_FUNCTION_ANIMATION);
+     // Custom Mood blanks the cube and arms the custom-function animation.
+     setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
    }else if(inChar=='R'){
-     // Run the currently compiled custom function only when one is valid.
-     if(bluetoothFunctionValid){
-       blinkAndSetMode(1,BLUETOOTH_FUNCTION_ANIMATION);
-     }
+     if(bluetoothFunctionValid)setMode(1,BLUETOOTH_FUNCTION_ANIMATION);
    }
  }
 
+ now=millis();
  if(currentCubeMode==0){
    if(now-animationStart>=AUTO_MODE_CAROUSEL_TIME){animationIndex=(animationIndex+1)%BUILTIN_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;}
    if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
