@@ -37,8 +37,8 @@
 
     <h3>Cube Controls</h3>
     <div class="buttons">
-        <button onclick="sendModeCommand('A')">Auto (A)</button>
-        <button onclick="sendModeCommand('M')">Manual (M)</button>
+        <button id="autoBtn">Auto (A)</button>
+        <button id="manualBtn">Manual (M)</button>
         <button class="next" onclick="sendModeCommand('N')">Next Animation (N)</button>
         <button class="custom" id="customMoodBtn" onclick="enterCustomMood()">Custom Mood (C)</button>
     </div>
@@ -156,8 +156,25 @@ async function sendCommand(command) {
 }
 
 async function sendModeCommand(command) {
+    if (!bleCharacteristic) {
+        alert("Please connect to the HM-10 Bluetooth module first.");
+        return;
+    }
     const ok = await sendCommand(command);
     if (ok) resetCustomState();
+}
+
+window.sendModeCommand = sendModeCommand;
+
+function bindModeButtons() {
+    document.getElementById('autoBtn').addEventListener('click', () => sendModeCommand('A'));
+    document.getElementById('manualBtn').addEventListener('click', () => sendModeCommand('M'));
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindModeButtons);
+} else {
+    bindModeButtons();
 }
 
 async function enterCustomMood() {
