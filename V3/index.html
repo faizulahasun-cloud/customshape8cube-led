@@ -49,7 +49,7 @@
         <b>Custom Mood</b> sends the single character <b>C</b> and blanks/stops the cube.<br>
         <b>Send Function</b> sends <b>@expressionE</b>. <b>@</b> starts reception and <b>E</b> ends reception. No newline is sent and E does not compile the function.<br>
         <b>Run Animation</b> sends the single character <b>R</b>. R compiles the stored function and starts it only if compilation succeeds.<br>
-        Maximum function length: 92 characters. Maximum compiled bytecode: 56 instructions.
+        Maximum function length: 192 characters. Maximum compiled bytecode: 80 instructions.
     </p>
     <div class="buttons">
         <button class="send" id="sendFunctionBtn" onclick="sendFunction()" disabled>Send Function</button>
@@ -177,8 +177,8 @@ async function sendFunction() {
         alert("Enter a V3 function expression first.");
         return;
     }
-    if (expression.length > 92) {
-        alert("Function is too long. Maximum is 92 characters.");
+    if (expression.length > 192) {
+        alert("Function is too long. Maximum is 192 characters.");
         return;
     }
     const encoder = new TextEncoder();
