@@ -262,7 +262,7 @@ function initController() {
             console.error(`Controller button not found: #${id}`);
             return;
         }
-        btn.onclick = func;
+        btn.addEventListener('click', func);
     });
 
     updateModeUI();
