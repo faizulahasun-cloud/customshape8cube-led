@@ -15,6 +15,7 @@
     button { border:0; border-radius:6px; padding:12px 18px; font-weight:bold; cursor:pointer; background:#008cba; color:white; }
     button:hover { background:#005f73; }
     button:disabled { opacity:0.45; cursor:not-allowed; }
+    button[aria-pressed="true"] { outline:3px solid #f4f4f9; outline-offset:2px; box-shadow:0 0 0 2px #008cba; }
     .connect { background:#28a745; }
     .disconnect { background:#dc3545; }
     .next { background:#ffc107; color:#212529; }
@@ -31,16 +32,16 @@
     <div id="status" class="status disconnected">BLUETOOTH: DISCONNECTED</div>
 
     <div class="buttons">
-        <button class="connect" id="connectBtn">Connect HM-10</button>
-        <button class="disconnect" id="disconnectBtn" style="display:none">Disconnect</button>
+        <button type="button" class="connect" id="connectBtn">Connect HM-10</button>
+        <button type="button" class="disconnect" id="disconnectBtn" style="display:none">Disconnect</button>
     </div>
 
     <h3>Cube Controls</h3>
     <div class="buttons">
-        <button id="autoBtn">Auto (A)</button>
-        <button id="manualBtn">Manual (M)</button>
-        <button class="next" id="nextBtn">Next Animation (N)</button>
-        <button class="custom" id="customMoodBtn">Custom Mood (C)</button>
+        <button type="button" id="autoBtn" aria-pressed="false">Auto (A)</button>
+        <button type="button" id="manualBtn" aria-pressed="false">Manual (M)</button>
+        <button type="button" class="next" id="nextBtn">Next Animation (N)</button>
+        <button type="button" class="custom" id="customMoodBtn" aria-pressed="false">Custom Mood (C)</button>
     </div>
 
     <h3>Custom Function</h3>
@@ -52,8 +53,8 @@
         Maximum function length: 192 characters. Maximum compiled bytecode: 80 instructions.
     </p>
     <div class="buttons">
-        <button class="send" id="sendFunctionBtn" disabled>Send Function</button>
-        <button class="run" id="runAnimationBtn" disabled>Run Animation</button>
+        <button type="button" class="send" id="sendFunctionBtn" disabled>Send Function</button>
+        <button type="button" class="run" id="runAnimationBtn" disabled>Run Animation</button>
     </div>
     <div id="functionTransferStatus" class="status" style="display:none"></div>
 </div>
@@ -62,7 +63,7 @@
 let bleDevice = null;
 let bleCharacteristic = null;
 let writeQueue = Promise.resolve();
-let customModeSelected = false;
+let uiMode = "AUTO";
 let functionTransferSucceeded = false;
 
 const UART_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
@@ -70,13 +71,28 @@ const UART_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb";
 const BLE_CHUNK_SIZE = 20;
 const BLE_CHUNK_DELAY_MS = 20;
 
+function updateModeUI() {
+    const modes = {
+        AUTO: document.getElementById('autoBtn'),
+        MANUAL: document.getElementById('manualBtn'),
+        CUSTOM: document.getElementById('customMoodBtn')
+    };
+
+    Object.entries(modes).forEach(([mode, btn]) => {
+        const active = uiMode === mode;
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+
+    updateCustomControls();
+}
+
 function updateCustomControls() {
-    document.getElementById('sendFunctionBtn').disabled = !customModeSelected || !bleCharacteristic;
-    document.getElementById('runAnimationBtn').disabled = !customModeSelected || !bleCharacteristic || !functionTransferSucceeded;
+    const customSelected = uiMode === 'CUSTOM';
+    document.getElementById('sendFunctionBtn').disabled = !customSelected || !bleCharacteristic;
+    document.getElementById('runAnimationBtn').disabled = !customSelected || !bleCharacteristic || !functionTransferSucceeded;
 }
 
 function resetCustomState() {
-    customModeSelected = false;
     functionTransferSucceeded = false;
     document.getElementById('functionTransferStatus').style.display = 'none';
     updateCustomControls();
@@ -93,7 +109,9 @@ async function connectBLE() {
         const service = await server.getPrimaryService(UART_SERVICE_UUID);
         bleCharacteristic = await service.getCharacteristic(UART_CHAR_UUID);
         setStatus(true);
+        uiMode = 'AUTO';
         resetCustomState();
+        updateModeUI();
         console.log("HM-10 connected. Service:", UART_SERVICE_UUID, "Characteristic:", UART_CHAR_UUID);
     } catch (error) {
         console.error(error);
@@ -113,7 +131,9 @@ function setStatus(connected) {
 function onDisconnected() {
     bleCharacteristic = null;
     bleDevice = null;
+    uiMode = 'AUTO';
     resetCustomState();
+    updateModeUI();
     setStatus(false);
     console.log("HM-10 disconnected.");
 }
@@ -160,13 +180,18 @@ async function sendCommand(command) {
     }
 }
 
-async function sendModeCommand(command) {
+async function selectMode(mode, command) {
     if (!bleCharacteristic) {
         alert("Please connect to the HM-10 Bluetooth module first.");
         return;
     }
     const ok = await sendCommand(command);
-    if (ok) resetCustomState();
+    if (!ok) return;
+
+    uiMode = mode;
+    resetCustomState();
+    updateModeUI();
+    console.log(`UI mode selected: ${mode}`);
 }
 
 async function enterCustomMood() {
@@ -176,15 +201,14 @@ async function enterCustomMood() {
     }
     const ok = await sendCommand('C');
     if (!ok) return;
-    customModeSelected = true;
-    functionTransferSucceeded = false;
-    document.getElementById('functionTransferStatus').style.display = 'none';
-    updateCustomControls();
+    uiMode = 'CUSTOM';
+    resetCustomState();
+    updateModeUI();
     console.log("Custom Mood selected.");
 }
 
 async function sendFunction() {
-    if (!customModeSelected) return;
+    if (uiMode !== 'CUSTOM' || !bleCharacteristic) return;
     const expression = document.getElementById('functionInput').value.trim();
     if (!expression) {
         alert("Enter a V3 function expression first.");
@@ -215,20 +239,18 @@ async function sendFunction() {
 }
 
 async function runAnimation() {
-    if (!customModeSelected || !functionTransferSucceeded) return;
+    if (uiMode !== 'CUSTOM' || !functionTransferSucceeded) return;
     const ok = await sendCommand('R');
     if (ok) console.log("V3 custom animation run command sent.");
 }
 
-// Single initialization path: every controller button is bound here.
-// No inline onclick handlers are used, preventing partial event-binding failures.
 function initController() {
     const buttons = {
         'connectBtn': connectBLE,
         'disconnectBtn': disconnectBLE,
-        'autoBtn': () => sendModeCommand('A'),
-        'manualBtn': () => sendModeCommand('M'),
-        'nextBtn': () => sendModeCommand('N'),
+        'autoBtn': () => selectMode('AUTO', 'A'),
+        'manualBtn': () => selectMode('MANUAL', 'M'),
+        'nextBtn': () => sendCommand('N'),
         'customMoodBtn': enterCustomMood,
         'sendFunctionBtn': sendFunction,
         'runAnimationBtn': runAnimation
@@ -243,8 +265,9 @@ function initController() {
         btn.onclick = func;
     });
 
+    updateModeUI();
     updateCustomControls();
-    console.log("V3 controller initialized.");
+    console.log("V3 controller initialized. Initial UI mode: AUTO");
 }
 
 if (document.readyState === 'loading') {
