@@ -31,6 +31,7 @@ byte confirmationType=CONFIRMATION_NONE;
 byte confirmationPhase=0;
 unsigned long confirmationPhaseStart=0;
 bool pendingCompiledConfirmation=false;
+bool runRequestedAfterReceivedConfirmation=false;
 
 struct ColumnMap { byte reg; byte bit; };
 const ColumnMap COLUMN_MAP[64]={
@@ -185,29 +186,21 @@ void loop(){
  static bool hasTriggeredLongPress=false;
  bool currentTouchState=(digitalRead(TOUCH_PIN)==HIGH);
  if(currentTouchState&&!lastTouchState){touchDebounceTimer=now;hasTriggeredLongPress=false;}
- else if(currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&touchDuration>=3000UL){byte targetMode=(currentCubeMode==0)?1:0;setMode(targetMode,animationIndex%BUILTIN_ANIMATIONS);hasTriggeredLongPress=true;}}
- else if(!currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&currentCubeMode==1&&touchDuration>=50&&touchDuration<3000UL){byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;setMode(1,nextAnimation);}}
+ else if(currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&touchDuration>=3000UL){byte targetMode=(currentCubeMode==0)?1:0;cancelConfirmation();setMode(targetMode,animationIndex%BUILTIN_ANIMATIONS);hasTriggeredLongPress=true;}}
+ else if(!currentTouchState&&lastTouchState){unsigned long touchDuration=now-touchDebounceTimer;if(!hasTriggeredLongPress&&currentCubeMode==1&&touchDuration>=50&&touchDuration<3000UL){byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;cancelConfirmation();setMode(1,nextAnimation);}}
  lastTouchState=currentTouchState;
 
  while(bluetooth.available()>0){
    char inChar=(char)bluetooth.read();
-
-   // STRICT PROTOCOL/FUNCTION BOUNDARY:
-   // Once a function transfer is active, command characters A/M/N/C/R and the
-   // protocol marker @ are data for the function receiver, never commands.
-   // E alone is the transfer terminator and is never function data.
-   // This prevents a formula character from accidentally changing cube mode.
    if(V3FunctionConversion::isFunctionStarted()){
      if(inChar=='E'){
        V3FunctionConversion::stopReception();
-       // Confirmation #1 starts only after stopReception() has completed and
-       // the engine confirms the complete function is stored successfully.
        if(V3FunctionConversion::isFunctionComplete())startConfirmation(CONFIRMATION_RECEIVED);
      }else{
        V3FunctionConversion::receiveCharacter(inChar);
      }
    }else if(inChar=='@'){
-     // @ is a command-layer START marker only when no function transfer is active.
+     cancelConfirmation();
      blankCubeAndStop();
      currentCubeMode=1;
      animationIndex=BLUETOOTH_FUNCTION_ANIMATION;
@@ -216,14 +209,17 @@ void loop(){
      lastFrameTime=millis();
      V3FunctionConversion::startReception();
    }else if(inChar=='A'){
+     cancelConfirmation();
      setMode(0,animationIndex%BUILTIN_ANIMATIONS);
    }else if(inChar=='M'){
+     cancelConfirmation();
      setMode(1,animationIndex%BUILTIN_ANIMATIONS);
    }else if(inChar=='N'&&currentCubeMode==1){
+     cancelConfirmation();
      byte nextAnimation=(animationIndex+1)%BUILTIN_ANIMATIONS;
      setMode(1,nextAnimation);
    }else if(inChar=='C'){
-     // Custom selection: clear the full voxel state and WAIT with multiplexing stopped.
+     cancelConfirmation();
      bluetoothFunctionValid=false;
      blankCubeAndStop();
      currentCubeMode=1;
@@ -232,15 +228,14 @@ void loop(){
      animationStart=millis();
      lastFrameTime=millis();
    }else if(inChar=='R'){
-     // R is the only command that compiles and starts the stored function.
-     // If confirmation #1 is still running, compile now and queue confirmation #2
-     // so the two confirmations cannot overlap. Otherwise blank and compile normally.
-     if(confirmationActive){
+     // R during the received-function confirmation is queued. Compile first,
+     // then let finishConfirmation() start confirmation #2 only after #1 ends.
+     if(confirmationActive && confirmationType==CONFIRMATION_RECEIVED){
        if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
          bluetoothFunctionValid=true;
          pendingCompiledConfirmation=true;
        }
-     }else{
+     }else if(!confirmationActive){
        blankCubeAndStop();
        if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
          bluetoothFunctionValid=true;
