@@ -31,16 +31,16 @@
     <div id="status" class="status disconnected">BLUETOOTH: DISCONNECTED</div>
 
     <div class="buttons">
-        <button class="connect" id="connectBtn" onclick="connectBLE()">Connect HM-10</button>
-        <button class="disconnect" id="disconnectBtn" onclick="disconnectBLE()" style="display:none">Disconnect</button>
+        <button class="connect" id="connectBtn">Connect HM-10</button>
+        <button class="disconnect" id="disconnectBtn" style="display:none">Disconnect</button>
     </div>
 
     <h3>Cube Controls</h3>
     <div class="buttons">
         <button id="autoBtn">Auto (A)</button>
         <button id="manualBtn">Manual (M)</button>
-        <button class="next" onclick="sendModeCommand('N')">Next Animation (N)</button>
-        <button class="custom" id="customMoodBtn" onclick="enterCustomMood()">Custom Mood (C)</button>
+        <button class="next" id="nextBtn">Next Animation (N)</button>
+        <button class="custom" id="customMoodBtn">Custom Mood (C)</button>
     </div>
 
     <h3>Custom Function</h3>
@@ -52,8 +52,8 @@
         Maximum function length: 192 characters. Maximum compiled bytecode: 80 instructions.
     </p>
     <div class="buttons">
-        <button class="send" id="sendFunctionBtn" onclick="sendFunction()" disabled>Send Function</button>
-        <button class="run" id="runAnimationBtn" onclick="runAnimation()" disabled>Run Animation</button>
+        <button class="send" id="sendFunctionBtn" disabled>Send Function</button>
+        <button class="run" id="runAnimationBtn" disabled>Run Animation</button>
     </div>
     <div id="functionTransferStatus" class="status" style="display:none"></div>
 </div>
@@ -94,6 +94,7 @@ async function connectBLE() {
         bleCharacteristic = await service.getCharacteristic(UART_CHAR_UUID);
         setStatus(true);
         resetCustomState();
+        console.log("HM-10 connected. Service:", UART_SERVICE_UUID, "Characteristic:", UART_CHAR_UUID);
     } catch (error) {
         console.error(error);
         alert("Bluetooth connection failed: " + error.message);
@@ -114,6 +115,7 @@ function onDisconnected() {
     bleDevice = null;
     resetCustomState();
     setStatus(false);
+    console.log("HM-10 disconnected.");
 }
 
 async function disconnectBLE() {
@@ -145,11 +147,14 @@ function writeBytes(bytes) {
 }
 
 async function sendCommand(command) {
+    console.log(`Attempting to send command: ${command}`);
     const encoder = new TextEncoder();
     try {
-        return await writeBytes(encoder.encode(command));
+        const result = await writeBytes(encoder.encode(command));
+        if (result) console.log(`Command ${command} sent successfully.`);
+        return result;
     } catch (error) {
-        console.error(error);
+        console.error(`Transfer failed for ${command}:`, error);
         alert("Command transfer failed: " + error.message);
         return false;
     }
@@ -164,19 +169,6 @@ async function sendModeCommand(command) {
     if (ok) resetCustomState();
 }
 
-window.sendModeCommand = sendModeCommand;
-
-function bindModeButtons() {
-    document.getElementById('autoBtn').addEventListener('click', () => sendModeCommand('A'));
-    document.getElementById('manualBtn').addEventListener('click', () => sendModeCommand('M'));
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindModeButtons);
-} else {
-    bindModeButtons();
-}
-
 async function enterCustomMood() {
     if (!bleCharacteristic) {
         alert("Connect the HM-10 first.");
@@ -188,6 +180,7 @@ async function enterCustomMood() {
     functionTransferSucceeded = false;
     document.getElementById('functionTransferStatus').style.display = 'none';
     updateCustomControls();
+    console.log("Custom Mood selected.");
 }
 
 async function sendFunction() {
@@ -225,6 +218,39 @@ async function runAnimation() {
     if (!customModeSelected || !functionTransferSucceeded) return;
     const ok = await sendCommand('R');
     if (ok) console.log("V3 custom animation run command sent.");
+}
+
+// Single initialization path: every controller button is bound here.
+// No inline onclick handlers are used, preventing partial event-binding failures.
+function initController() {
+    const buttons = {
+        'connectBtn': connectBLE,
+        'disconnectBtn': disconnectBLE,
+        'autoBtn': () => sendModeCommand('A'),
+        'manualBtn': () => sendModeCommand('M'),
+        'nextBtn': () => sendModeCommand('N'),
+        'customMoodBtn': enterCustomMood,
+        'sendFunctionBtn': sendFunction,
+        'runAnimationBtn': runAnimation
+    };
+
+    Object.entries(buttons).forEach(([id, func]) => {
+        const btn = document.getElementById(id);
+        if (!btn) {
+            console.error(`Controller button not found: #${id}`);
+            return;
+        }
+        btn.onclick = func;
+    });
+
+    updateCustomControls();
+    console.log("V3 controller initialized.");
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initController, { once: true });
+} else {
+    initController();
 }
 </script>
 </body>
