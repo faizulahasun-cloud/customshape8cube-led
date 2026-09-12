@@ -81,6 +81,17 @@ void setConfirmationDisplay(bool on){
  interrupts();
 }
 
+void cancelConfirmation(){
+ if(!confirmationActive)return;
+ confirmationActive=false;
+ confirmationType=CONFIRMATION_NONE;
+ confirmationPhase=0;
+ confirmationPhaseStart=0;
+ pendingCompiledConfirmation=false;
+ setConfirmationDisplay(false);
+ stopRefreshTimer();
+}
+
 void startConfirmation(byte type){
  confirmationActive=true;
  confirmationType=type;
