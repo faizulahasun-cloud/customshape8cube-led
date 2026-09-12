@@ -13,6 +13,7 @@ namespace V3FunctionConversion {
 
 static const uint16_t MAX_FUNCTION_LENGTH = 192;
 static const uint8_t MAX_BYTECODE_LENGTH = 80;
+static const uint8_t EVALUATOR_STACK_SIZE = 16;
 
 enum OpCode:uint8_t{OP_END=0,OP_CONST,OP_X,OP_Y,OP_Z,OP_F,OP_ADD,OP_SUB,OP_MUL,OP_DIV,OP_MOD,OP_NEG,OP_SIN,OP_COS,OP_SQRT,OP_ABS,OP_NOT,OP_LT,OP_LE,OP_GT,OP_GE,OP_EQ,OP_NE,OP_AND,OP_OR};
 struct Instruction{uint8_t op;float value;};
@@ -107,14 +108,14 @@ inline bool compileFunction(){
 }
 
 inline bool evaluate(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F){
-  if(!functionValid)return false;float stack[12];uint8_t sp=0;
+  if(!functionValid)return false;float stack[EVALUATOR_STACK_SIZE];uint8_t sp=0;
   for(uint8_t i=0;i<bytecodeLength;i++){const Instruction& ins=bytecode[i];switch(ins.op){
     case OP_END:return sp?(stack[sp-1]!=0.0f):false;
-    case OP_CONST:if(sp>=12)return false;stack[sp++]=ins.value;break;
-    case OP_X:if(sp>=12)return false;stack[sp++]=X;break;
-    case OP_Y:if(sp>=12)return false;stack[sp++]=Y;break;
-    case OP_Z:if(sp>=12)return false;stack[sp++]=Z;break;
-    case OP_F:if(sp>=12)return false;stack[sp++]=F;break;
+    case OP_CONST:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=ins.value;break;
+    case OP_X:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=X;break;
+    case OP_Y:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=Y;break;
+    case OP_Z:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=Z;break;
+    case OP_F:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=F;break;
     case OP_NEG:if(!sp)return false;stack[sp-1]=-stack[sp-1];break;
     case OP_NOT:if(!sp)return false;stack[sp-1]=(stack[sp-1]==0.0f);break;
     case OP_SIN:if(!sp)return false;stack[sp-1]=sin(stack[sp-1]);break;
