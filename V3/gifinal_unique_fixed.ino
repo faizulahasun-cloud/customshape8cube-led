@@ -228,10 +228,13 @@ void loop(){
      animationStart=millis();
      lastFrameTime=millis();
    }else if(inChar=='R'){
-     // R during the received-function confirmation is queued, not compiled yet.
-     // Compilation starts immediately after confirmation #1 finishes.
+     // R during the received-function confirmation is queued. Compile first,
+     // then let finishConfirmation() start confirmation #2 only after #1 ends.
      if(confirmationActive && confirmationType==CONFIRMATION_RECEIVED){
-       pendingCompiledConfirmation=true;
+       if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
+         bluetoothFunctionValid=true;
+         pendingCompiledConfirmation=true;
+       }
      }else if(!confirmationActive){
        blankCubeAndStop();
        if(V3FunctionConversion::isFunctionComplete() && V3FunctionConversion::compileFunction()){
