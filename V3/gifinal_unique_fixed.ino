@@ -2,6 +2,7 @@
 #include <avr/interrupt.h>
 #include <AltSoftSerial.h>
 #include "V3FunctionConversion.h"
+#include "AnimationRegistry.h"
 
 const byte DATA_PIN=11; const byte CLOCK_PIN=13; const byte LATCH_PIN=12; const byte TOUCH_PIN=10; const byte POT_PIN=A0;
 AltSoftSerial bluetooth;
@@ -171,7 +172,7 @@ bool animationVoxel(byte a,byte f,byte x,byte y,byte z){
  if(a==20){byte r=9-(f%10);int d=min(abs((int)x-3),abs((int)x-4))+min(abs((int)y-3),abs((int)y-4))+min(abs((int)z-3),abs((int)z-4));return d==r||d==r+1;} if(a==21){int d=abs((int)x-3)+abs((int)y-3)+abs((int)z-3);return((d+f)%4)<2;} if(a==22)return((x+y+z+f)%8)==0;
  if(a==23){if(!((x==0||x==7)&&(y==0||y==7)&&(z==0||z==7)))return false;byte c=((z==7)?4:0)+((y==7)?2:0)+((x==7)?1:0);return c==(f%8);} if(a==24)return firecrackerVoxel(f,x,y,z); if(a==25)return snakeVoxel(f,x,y,z); if(a==26)return rotatingHeartVoxel(f,x,y,z); if(a==27)return v3DirectionalSweepVoxel(f,x,y,z); if(a==28)return v3SphereVoxel(f,x,y,z); if(a==29)return v3TunnelVoxel(f,x,y,z); if(a==30)return v3HelixVoxel(f,x,y,z); if(a==31)return v3MathGridVoxel(f,x,y,z); if(a==32)return v3MatrixRainVoxel(f,x,y,z); if(a==33)return v3WireCubeVoxel(f,x,y,z); if(a==34)return v3PlasmaVoxel(f,x,y,z); if(a==35)return v3CurtainVoxel(f,x,y,z); if(a==36)return v3HelixOrbitalVoxel(f,x,y,z); if(a==37)return bluetoothFunctionVoxel(f,x,y,z); return false;
 }
-void drawAnimationFrame(unsigned int animation,byte frame){if(animation>=TOTAL_ANIMATIONS)return;clearCube();for(byte z=0;z<8;z++)for(byte y=0;y<8;y++)for(byte x=0;x<8;x++)if(animationVoxel(animation,frame,x,y,z))setVoxel(x,y,z,true);}
+void drawAnimationFrame(unsigned int animation,byte frame){if(animation>=TOTAL_ANIMATIONS||!animationRegistryContains((byte)animation))return;AnimationDescriptor descriptor=animationRegistryGet((byte)animation);if(descriptor.generator==nullptr)return;clearCube();for(byte z=0;z<8;z++)for(byte y=0;y<8;y++)for(byte x=0;x<8;x++)if(descriptor.generator((byte)animation,frame,x,y,z))setVoxel(x,y,z,true);}
 
 void setMode(byte targetMode,unsigned int targetAnimation){
  blankCubeAndStop();
@@ -264,10 +265,7 @@ void loop(){
 
  if(currentCubeMode==0){
    if(now-animationStart>=AUTO_MODE_CAROUSEL_TIME){animationIndex=(animationIndex+1)%BUILTIN_ANIMATIONS;frameCounter=0;animationStart=now;lastFrameTime=now;}
-   if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
- }else if(currentCubeMode==1 && animationIndex==BLUETOOTH_FUNCTION_ANIMATION && bluetoothFunctionValid){
-   if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
- }else if(currentCubeMode==1 && animationIndex<BUILTIN_ANIMATIONS){
-   if(now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
  }
+ bool animationReady=(animationIndex<TOTAL_ANIMATIONS)&&(animationIndex<BUILTIN_ANIMATIONS||(animationIndex==BLUETOOTH_FUNCTION_ANIMATION&&bluetoothFunctionValid));
+ if(animationReady&&(currentCubeMode==0||currentCubeMode==1)&&now-lastFrameTime>=FRAME_TIME){lastFrameTime=now;drawAnimationFrame(animationIndex,frameCounter);prepareDisplayData();commitFrame();frameCounter=(frameCounter+1)%50;}
 }
