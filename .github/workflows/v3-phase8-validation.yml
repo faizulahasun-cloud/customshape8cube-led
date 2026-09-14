@@ -1,0 +1,33 @@
+name: V3 Phase 8 Validation
+
+on:
+  push:
+    branches:
+      - phase-3-register-existing-animations
+  pull_request:
+    branches:
+      - main
+      - phase-3-register-existing-animations
+
+jobs:
+  validate-v3:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout clean repository
+        uses: actions/checkout@v4
+
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install AVR core and libraries
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+          arduino-cli lib install AltSoftSerial
+
+      - name: Compile V3 for Arduino Uno
+        run: |
+          arduino-cli compile --fqbn arduino:avr:uno V3
+
+      - name: Run architecture regression checks
+        run: python3 tests/verify_v3_phase3_8.py
