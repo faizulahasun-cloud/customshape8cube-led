@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>8×8×8 3D Pad — LED Cube Formula Designer</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0d10;--panel:#14181d;--line:#303740;--text:#e9eef3;--muted:#9aa6b2;--on:#65d6ff;--accent:#8df0a5;--warn:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}main{max-width:1200px;margin:auto;padding:18px}h1{font-size:22px;margin:0 0 4px}p{margin:4px 0;color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(320px,1fr) 330px;gap:14px;margin-top:14px}@media(max-width:820px){.layout{grid-template-columns:1fr}}.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}.stage{position:relative;min-height:620px;height:min(72vh,760px);display:flex;align-items:center;justify-content:center;overflow:hidden}.stage canvas{width:100%;height:100%;touch-action:none;cursor:crosshair}.controls{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}button,select{background:#1d232a;color:var(--text);border:1px solid #3b444e;border-radius:7px;padding:8px 10px;font:inherit}button:hover{border-color:#687582}button.active{border-color:var(--accent);color:var(--accent)}.danger{color:#ff9a9a}.row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:9px 0}.value{font-variant-numeric:tabular-nums;color:var(--accent)}label{color:var(--muted);font-size:13px}input[type=range]{width:130px}.formula{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#090b0e;border:1px solid var(--line);border-radius:8px;padding:11px;min-height:72px;overflow-wrap:anywhere;color:var(--accent)}.status{font-size:13px;color:var(--muted);margin-top:8px}.legend{display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:12px;color:var(--muted)}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:var(--on)}.hint{font-size:12px;color:var(--muted);margin-top:8px}.coords{font-family:ui-monospace,monospace;color:var(--text)}.small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <h1>8×8×8 3D Pad</h1>
+  <p>Standalone voxel designer. Select or connect voxels, then generate a mathematical LED-cube expression.</p>
+  <div class="layout">
+    <section class="card stage">
+      <canvas id="pad"></canvas>
+    </section>
+    <aside class="card">
+      <div class="controls">
+        <button id="selectBtn" class="active">Select</button>
+        <button id="eraseBtn">Erase</button>
+        <button id="lineBtn">Connect line</button>
+        <button id="clearBtn" class="danger">Clear</button>
+      </div>
+      <div class="row"><label>Rotation X</label><input id="rx" type="range" min="-70" max="70" value="25"><span id="rxv" class="value">25°</span></div>
+      <div class="row"><label>Rotation Z</label><input id="rz" type="range" min="-180" max="180" value="35"><span id="rzv" class="value">35°</span></div>
+      <div class="row"><label>Grid size</label><span class="value">8×8×8</span></div>
+      <div class="row"><label>Selected voxels</label><span id="count" class="value">0</span></div>
+      <div class="row"><label>Last voxel</label><span id="coord" class="coords">—</span></div>
+      <hr style="border:0;border-top:1px solid var(--line)">
+      <label>Generated formula</label>
+      <div id="formula" class="formula">Select voxels to generate a formula.</div>
+      <div id="method" class="status"></div>
+      <div class="controls" style="margin-top:10px"><button id="copyBtn">Copy formula</button><button id="sampleBtn">Sample diagonal</button></div>
+      <div class="legend">
+        <div><span class="dot"></span>selected</div><div>● voxel</div>
+        <div>Click/touch a voxel</div><div>Drag empty space: rotate</div>
+      </div>
+      <div class="hint">Coordinate contract: X = left→right, Y = front→rear, Z = bottom→top. The generated expression is intended for the cube's X/Y/Z/F-style function language.</div>
+    </aside>
+  </div>
+</main>
+<script>
+'use strict';
+const canvas=document.getElementById('pad'),ctx=canvas.getContext('2d');
+const N=8, selected=new Set();
+let mode='select', rx=25, rz=35, dragging=false, moved=false, last={x:0,y:0}, dragStart={x:0,y:0};
+const $=id=>document.getElementById(id);
+function key(x,y,z){return `${x},${y},${z}`}
+function parseKey(k){return k.split(',').map(Number)}
+function resize(){const r=canvas.getBoundingClientRect(),d=devicePixelRatio||1;canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);draw()}
+function project(x,y,z){
+  const a=rz*Math.PI/180,b=rx*Math.PI/180;
+  let X=x-3.5,Y=y-3.5,Z=z-3.5;
+  const X1=X*Math.cos(a)-Y*Math.sin(a),Y1=X*Math.sin(a)+Y*Math.cos(a);
+  const Y2=Y1*Math.cos(b)-Z*Math.sin(b),Z2=Y1*Math.sin(b)+Z*Math.cos(b);
+  const scale=Math.min(canvas.clientWidth,canvas.clientHeight)*.055;
+  return {x:canvas.clientWidth/2+X1*scale,y:canvas.clientHeight/2-Z2*scale,depth:Y2+Z2*.35};
+}
+function draw(){
+  const w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);
+  const pts=[];for(let z=0;z<N;z++)for(let y=0;y<N;y++)for(let x=0;x<N;x++)pts.push({x,y,z,p:project(x,y,z)});
+  pts.sort((a,b)=>a.p.depth-b.p.depth);
+  ctx.lineWidth=1;ctx.strokeStyle='#263039';
+  for(const q of pts){ctx.beginPath();ctx.arc(q.p.x,q.p.y,2.4,0,Math.PI*2);ctx.stroke()}
+  // three reference axes through the origin corner
+  const o=project(0,0,0), ax=project(7,0,0), ay=project(0,7,0), az=project(0,0,7);
+  ctx.lineWidth=2;ctx.strokeStyle='#4a555f';for(const e of [ax,ay,az]){ctx.beginPath();ctx.moveTo(o.x,o.y);ctx.lineTo(e.x,e.y);ctx.stroke()}
+  ctx.font='12px system-ui';ctx.fillStyle='#9aa6b2';ctx.fillText('X',ax.x+5,ax.y);ctx.fillText('Y',ay.x+5,ay.y);ctx.fillText('Z',az.x+5,az.y-4);
+  // selected voxels on top
+  ctx.font='11px ui-monospace';
+  for(const k of selected){const [x,y,z]=parseKey(k),p=project(x,y,z);ctx.beginPath();ctx.fillStyle='#65d6ff';ctx.arc(p.x,p.y,5.5,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#eafaff';ctx.stroke();}
+}
+function nearestVoxel(px,py){let best=null,bd=11;for(let z=0;z<N;z++)for(let y=0;y<N;y++)for(let x=0;x<N;x++){const p=project(x,y,z),d=Math.hypot(p.x-px,p.y-py);if(d<bd){bd=d;best={x,y,z}}}return best}
+function toggle(v){if(!v)return;const k=key(v.x,v.y,v.z);if(mode==='erase')selected.delete(k);else selected.has(k)?selected.delete(k):selected.add(k);update()}
+function addLine(a,b){const n=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y),Math.abs(b.z-a.z));for(let i=0;i<=n;i++){const t=n?i/n:0;const x=Math.round(a.x+(b.x-a.x)*t),y=Math.round(a.y+(b.y-a.y)*t),z=Math.round(a.z+(b.z-a.z)*t);selected.add(key(x,y,z))}update()}
+function expression(){
+  const pts=[...selected].map(parseKey);if(!pts.length)return {f:'',m:''};
+  const S=new Set(selected);
+  // Exact full-axis planes.
+  for(let axis=0;axis<3;axis++)for(let v=0;v<8;v++){
+    let ok=true,c=0;for(let z=0;z<8;z++)for(let y=0;y<8;y++)for(let x=0;x<8;x++){const p=[x,y,z];if(p[axis]===v){c++;if(!S.has(key(x,y,z)))ok=false}else if(S.has(key(x,y,z)))ok=false}if(ok&&c===64){const n=['X','Y','Z'][axis];return {f:`${n}==${v}`,m:'Recognized a complete plane.'}}
+  }
+  // Main diagonals and anti-diagonals.
+  const diag=[];for(let i=0;i<8;i++)diag.push(key(i,i,i));if(pts.length===8&&diag.every(k=>S.has(k)))return {f:'X==Y&&Y==Z',m:'Recognized the main 3D diagonal.'};
+  const anti=[];for(let i=0;i<8;i++)anti.push(key(i,i,7-i));if(pts.length===8&&anti.every(k=>S.has(k)))return {f:'X==Y&&Z==(7-X)',m:'Recognized a diagonal with reversed Z.'};
+  // Coordinate-axis straight lines.
+  const names=['X','Y','Z'];
+  for(let axis=0;axis<3;axis++)for(let a=0;a<8;a++)for(let b=0;b<8;b++){
+    const line=[];for(let t=0;t<8;t++){const p=[a,b,t];if(axis===0)p=[t,a,b];if(axis===1)p=[a,t,b];line.push(key(...p))}
+    if(pts.length===8&&line.every(k=>S.has(k))){const fixed=names.filter((_,i)=>i!==axis);return {f:`${fixed[0]}==${a}&&${fixed[1]}==${b}`,m:'Recognized a straight 8-voxel axis line.'}}
+  }
+  // Parity patterns.
+  for(const parity of [0,1]){let ok=true,c=0;for(let z=0;z<8;z++)for(let y=0;y<8;y++)for(let x=0;x<8;x++){const on=((x+y+z)&1)===parity;if(on)c++;if(on!==S.has(key(x,y,z)))ok=false}if(ok)return {f:`(X+Y+Z)%2==${parity}`,m:'Recognized a 3D checker/parity field.'}}
+  // Exact coordinate DNF fallback. Always correct for the selected voxels.
+  const terms=pts.sort((a,b)=>a[2]-b[2]||a[1]-b[1]||a[0]-b[0]).map(([x,y,z])=>`(X==${x}&&Y==${y}&&Z==${z})`);
+  return {f:terms.join('||'),m:`Exact voxel expression (${pts.length} selected voxel${pts.length===1?'':'s'}).`}
+}
+function update(){ $('count').textContent=selected.size;$('coord').textContent=selected.size?parseKey([...selected][selected.size-1]).join(','): '—';const r=expression();$('formula').textContent=r.f||'Select voxels to generate a formula.';$('method').textContent=r.m;draw()}
+function setMode(m){mode=m;for(const id of ['selectBtn','eraseBtn','lineBtn'])$(id).classList.remove('active');$(m==='select'?'selectBtn':m==='erase'?'eraseBtn':'lineBtn').classList.add('active')}
+$('selectBtn').onclick=()=>setMode('select');$('eraseBtn').onclick=()=>setMode('erase');$('lineBtn').onclick=()=>setMode('line');$('clearBtn').onclick=()=>{selected.clear();update()};
+$('sampleBtn').onclick=()=>{selected.clear();for(let i=0;i<8;i++)selected.add(key(i,i,i));update()};
+$('copyBtn').onclick=async()=>{const f=$('formula').textContent;if(f&&f[0]!=='S')try{await navigator.clipboard.writeText(f);$('method').textContent='Formula copied to clipboard.'}catch(e){$('method').textContent='Clipboard access unavailable; select the formula manually.'}};
+$('rx').oninput=e=>{rx=+e.target.value;$('rxv').textContent=rx+'°';draw()};$('rz').oninput=e=>{rz=+e.target.value;$('rzv').textContent=rz+'°';draw()};
+canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);dragging=true;moved=false;last={x:e.clientX,y:e.clientY};dragStart={x:e.clientX,y:e.clientY}});
+canvas.addEventListener('pointermove',e=>{if(!dragging)return;const dx=e.clientX-last.x,dy=e.clientY-last.y;if(Math.hypot(e.clientX-dragStart.x,e.clientY-dragStart.y)>5)moved=true;if(moved&&mode!=='line'){rz+=dx*.45;rx=Math.max(-70,Math.min(70,rx+dy*.35));$('rx').value=rx;$('rz').value=((rz+180)%360+360)%360-180;$('rxv').textContent=Math.round(rx)+'°';$('rzv').textContent=Math.round(rz)+'°';draw()}last={x:e.clientX,y:e.clientY}});
+canvas.addEventListener('pointerup',e=>{if(!dragging)return;dragging=false;if(moved)return;const r=canvas.getBoundingClientRect(),v=nearestVoxel(e.clientX-r.left,e.clientY-r.top);if(!v)return;if(mode==='line'){const lastKey=[...selected].at(-1);if(lastKey)addLine(Object.fromEntries(['x','y','z'].map((n,i)=>[n,parseKey(lastKey)[i]])),v));else selected.add(key(v.x,v.y,v.z));update()}else toggle(v)});
+window.addEventListener('resize',resize);resize();update();
+</script>
+</body>
+</html>
