@@ -14,6 +14,20 @@ namespace V3FunctionConversion {
 static const uint16_t MAX_FUNCTION_LENGTH = 192;
 static const uint8_t MAX_BYTECODE_LENGTH = 80;
 static const uint8_t EVALUATOR_STACK_SIZE = 16;
+static const uint8_t FOURIER_MAX_HARMONICS = 8;
+static const uint8_t FOURIER_N = 50;
+static const uint8_t FOURIER_Q_SHIFT = 12;
+static const int32_t FOURIER_Q_ONE = (1L << FOURIER_Q_SHIFT);
+static const int32_t FOURIER_Q_LIMIT = 32767;
+
+enum Representation:uint8_t {REP_BYTECODE=0,REP_FOURIER=1};
+struct FourierRecord{
+  int16_t dc;
+  int16_t cosine[FOURIER_MAX_HARMONICS];
+  int16_t sine[FOURIER_MAX_HARMONICS];
+  uint8_t harmonics;
+  bool valid;
+};
 
 enum OpCode:uint8_t{OP_END=0,OP_CONST,OP_X,OP_Y,OP_Z,OP_F,OP_ADD,OP_SUB,OP_MUL,OP_DIV,OP_MOD,OP_NEG,OP_SIN,OP_COS,OP_SQRT,OP_ABS,OP_NOT,OP_LT,OP_LE,OP_GT,OP_GE,OP_EQ,OP_NE,OP_AND,OP_OR};
 struct Instruction{uint8_t op;float value;};
@@ -28,9 +42,17 @@ static Instruction bytecode[MAX_BYTECODE_LENGTH];
 static uint8_t bytecodeLength=0;
 static uint16_t parsePosition=0;
 static bool parseError=false;
+static Representation representation=REP_BYTECODE;
+static FourierRecord fourier={0,{0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0},0,false};
+static const int16_t FOURIER_SIN_LUT[FOURIER_N] PROGMEM={
+0,4107,8149,12062,15786,19260,22431,25247,27666,29648,31163,32187,32702,32702,32187,31163,29648,27666,25247,22431,
+19260,15786,12062,8149,4107,0,-4107,-8149,-12062,-15786,-19260,-22431,-25247,-27666,-29648,-31163,-32187,-32702,-32702,
+-32187,-31163,-29648,-27666,-25247,-22431,-19260,-15786,-12062,-8149,-4107};
+
 
 inline void resetReception(){
   functionLength=0;functionStarted=true;functionComplete=false;functionValid=false;receiveError=false;parsePosition=0;parseError=false;
+  representation=REP_BYTECODE;fourier.valid=false;fourier.harmonics=0;
   functionBuffer[0]='\0';
 }
 inline void startReception(){resetReception();}
@@ -99,15 +121,7 @@ inline bool parseComparison(){
 inline bool parseLogicalAnd(){if(!parseComparison())return false;while(true){skipSpaces();if(parsePosition+1<functionLength&&functionBuffer[parsePosition]=='&'&&functionBuffer[parsePosition+1]=='&'){parsePosition+=2;if(!parseComparison()||!emit(OP_AND))return false;}else return true;}}
 inline bool parseExpression(){if(!parseLogicalAnd())return false;while(true){skipSpaces();if(parsePosition+1<functionLength&&functionBuffer[parsePosition]=='|'&&functionBuffer[parsePosition+1]=='|'){parsePosition+=2;if(!parseLogicalAnd()||!emit(OP_OR))return false;}else return true;}}
 
-inline bool compileFunction(){
-  functionValid=false;bytecodeLength=0;parsePosition=0;parseError=receiveError;
-  if(!functionComplete||functionLength==0||receiveError)return false;
-  if(!parseExpression())return false;
-  skipSpaces();if(parsePosition!=functionLength||!emit(OP_END)){bytecodeLength=0;return false;}
-  functionValid=true;return true;
-}
-
-inline bool evaluate(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F){
+inline bool evaluateBytecode(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F){
   if(!functionValid)return false;float stack[EVALUATOR_STACK_SIZE];uint8_t sp=0;
   for(uint8_t i=0;i<bytecodeLength;i++){const Instruction& ins=bytecode[i];switch(ins.op){
     case OP_END:return sp?(stack[sp-1]!=0.0f):false;
@@ -138,4 +152,104 @@ inline bool evaluate(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F){
     default:return false;
   }}return false;
 }
+
+inline bool fourierCandidateIsFOnly(){
+  for(uint8_t i=0;i<bytecodeLength;i++){uint8_t op=bytecode[i].op;if(op==OP_X||op==OP_Y||op==OP_Z)return false;}
+  return true;
+}
+inline bool fourierQuantize(float value,int16_t& out){
+  if(value < -7.999f || value > 7.999f)return false;
+  long q=lround(value*(float)FOURIER_Q_ONE);
+  if(q < -FOURIER_Q_LIMIT || q > FOURIER_Q_LIMIT)return false;
+  out=(int16_t)q;return true;
+}
+inline int32_t fourierEvaluateQ(uint8_t F){
+  int32_t sum=(int32_t)fourier.dc;
+  for(uint8_t k=1;k<=fourier.harmonics;k++){
+    uint8_t idx=(uint8_t)((uint16_t)k*F%FOURIER_N);
+    int16_t s=pgm_read_word(&FOURIER_SIN_LUT[idx]);
+    int16_t co=pgm_read_word(&FOURIER_SIN_LUT[(idx+FOURIER_N/4)%FOURIER_N]);
+    sum+=((int32_t)fourier.cosine[k-1]*co)>>15;
+    sum+=((int32_t)fourier.sine[k-1]*s)>>15;
+  }
+  return sum;
+}
+inline bool tryCompileFourier(){
+  fourier.valid=false;fourier.harmonics=0;
+  if(!fourierCandidateIsFOnly())return false;
+  float samples[FOURIER_N];
+  for(uint8_t f=0;f<FOURIER_N;f++){
+    float stack[EVALUATOR_STACK_SIZE];uint8_t sp=0;float result=0.0f;
+    for(uint8_t i=0;i<bytecodeLength;i++){
+      const Instruction& ins=bytecode[i];
+      switch(ins.op){
+        case OP_END:result=sp?stack[sp-1]:0.0f;i=bytecodeLength;break;
+        case OP_CONST:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=ins.value;break;
+        case OP_F:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=f;break;
+        case OP_NEG:if(!sp)return false;stack[sp-1]=-stack[sp-1];break;
+        case OP_NOT:if(!sp)return false;stack[sp-1]=(stack[sp-1]==0.0f);break;
+        case OP_SIN:if(!sp)return false;stack[sp-1]=sin(stack[sp-1]);break;
+        case OP_COS:if(!sp)return false;stack[sp-1]=cos(stack[sp-1]);break;
+        case OP_SQRT:if(!sp)return false;stack[sp-1]=sqrt(max(0.0f,stack[sp-1]));break;
+        case OP_ABS:if(!sp)return false;stack[sp-1]=fabs(stack[sp-1]);break;
+        case OP_ADD:if(sp<2)return false;stack[sp-2]+=stack[--sp];break;
+        case OP_SUB:if(sp<2)return false;stack[sp-2]-=stack[--sp];break;
+        case OP_MUL:if(sp<2)return false;stack[sp-2]*=stack[--sp];break;
+        case OP_DIV:if(sp<2||stack[sp-1]==0.0f)return false;stack[sp-2]/=stack[--sp];break;
+        case OP_MOD:if(sp<2||stack[sp-1]==0.0f)return false;stack[sp-2]=fmod(stack[sp-2],stack[--sp]);break;
+        case OP_LT:if(sp<2)return false;stack[sp-2]=stack[sp-2]<stack[--sp];break;
+        case OP_LE:if(sp<2)return false;stack[sp-2]=stack[sp-2]<=stack[--sp];break;
+        case OP_GT:if(sp<2)return false;stack[sp-2]=stack[sp-2]>stack[--sp];break;
+        case OP_GE:if(sp<2)return false;stack[sp-2]=stack[sp-2]>=stack[--sp];break;
+        case OP_EQ:if(sp<2)return false;stack[sp-2]=stack[sp-2]==stack[--sp];break;
+        case OP_NE:if(sp<2)return false;stack[sp-2]=stack[sp-2]!=stack[--sp];break;
+        case OP_AND:if(sp<2)return false;stack[sp-2]=(stack[sp-2]!=0.0f)&&(stack[--sp]!=0.0f);break;
+        case OP_OR:if(sp<2)return false;stack[sp-2]=(stack[sp-2]!=0.0f)||(stack[--sp]!=0.0f);break;
+        default:return false;
+      }
+    }
+    samples[f]=result;
+  }
+  for(uint8_t H=1;H<=FOURIER_MAX_HARMONICS;H++){
+    float dc=0.0f;for(uint8_t f=0;f<FOURIER_N;f++)dc+=samples[f];dc/=FOURIER_N;
+    FourierRecord candidate;candidate.dc=0;candidate.harmonics=H;candidate.valid=false;
+    for(uint8_t k=0;k<FOURIER_MAX_HARMONICS;k++){candidate.cosine[k]=0;candidate.sine[k]=0;}
+    if(!fourierQuantize(dc,candidate.dc))continue;
+    bool ok=true;
+    for(uint8_t k=1;k<=H;k++){
+      float ak=0.0f,bk=0.0f;
+      for(uint8_t f=0;f<FOURIER_N;f++){
+        float phase=6.28318530718f*(float)k*(float)f/(float)FOURIER_N;
+        ak+=samples[f]*cos(phase);bk+=samples[f]*sin(phase);
+      }
+      ak*=2.0f/(float)FOURIER_N;bk*=2.0f/(float)FOURIER_N;
+      if(!fourierQuantize(ak,candidate.cosine[k-1])||!fourierQuantize(bk,candidate.sine[k-1])){ok=false;break;}
+    }
+    if(!ok)continue;
+    fourier=candidate;bool exact=true;
+    for(uint8_t f=0;f<FOURIER_N;f++){
+      if((samples[f]!=0.0f)!=(fourierEvaluateQ(f)!=0)){exact=false;break;}
+    }
+    if(exact){fourier.valid=true;return true;}
+  }
+  fourier.valid=false;return false;
+}
+
+inline bool compileFunction(){
+  functionValid=false;bytecodeLength=0;parsePosition=0;parseError=receiveError;
+  representation=REP_BYTECODE;fourier.valid=false;fourier.harmonics=0;
+  if(!functionComplete||functionLength==0||receiveError)return false;
+  if(!parseExpression())return false;
+  skipSpaces();if(parsePosition!=functionLength||!emit(OP_END)){bytecodeLength=0;return false;}
+  functionValid=true;
+  if(tryCompileFourier())representation=REP_FOURIER;
+  return true;
+}
+inline bool evaluate(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F){
+  if(!functionValid)return false;
+  if(representation==REP_FOURIER)return fourierEvaluateQ(F)!=0;
+  return evaluateBytecode(X,Y,Z,F);
+}
+inline Representation getRepresentation(){return representation;}
+inline uint8_t getFourierHarmonics(){return fourier.harmonics;}
 } // namespace V3FunctionConversion
