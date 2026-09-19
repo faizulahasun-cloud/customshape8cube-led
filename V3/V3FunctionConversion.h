@@ -121,10 +121,10 @@ inline bool parseComparison(){
 inline bool parseLogicalAnd(){if(!parseComparison())return false;while(true){skipSpaces();if(parsePosition+1<functionLength&&functionBuffer[parsePosition]=='&'&&functionBuffer[parsePosition+1]=='&'){parsePosition+=2;if(!parseComparison()||!emit(OP_AND))return false;}else return true;}}
 inline bool parseExpression(){if(!parseLogicalAnd())return false;while(true){skipSpaces();if(parsePosition+1<functionLength&&functionBuffer[parsePosition]=='|'&&functionBuffer[parsePosition+1]=='|'){parsePosition+=2;if(!parseLogicalAnd()||!emit(OP_OR))return false;}else return true;}}
 
-inline bool evaluateBytecode(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F){
-  if(!functionValid)return false;float stack[EVALUATOR_STACK_SIZE];uint8_t sp=0;
+inline bool evaluateBytecodeValue(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F,float& result){
+  float stack[EVALUATOR_STACK_SIZE];uint8_t sp=0;
   for(uint8_t i=0;i<bytecodeLength;i++){const Instruction& ins=bytecode[i];switch(ins.op){
-    case OP_END:return sp?(stack[sp-1]!=0.0f):false;
+    case OP_END:result=sp?stack[sp-1]:0.0f;return true;
     case OP_CONST:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=ins.value;break;
     case OP_X:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=X;break;
     case OP_Y:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=Y;break;
@@ -150,7 +150,11 @@ inline bool evaluateBytecode(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F){
     case OP_AND:if(sp<2)return false;stack[sp-2]=(stack[sp-2]!=0.0f)&&(stack[--sp]!=0.0f);break;
     case OP_OR:if(sp<2)return false;stack[sp-2]=(stack[sp-2]!=0.0f)||(stack[--sp]!=0.0f);break;
     default:return false;
-  }}return false;
+  }}
+  return false;
+}
+inline bool evaluateBytecode(uint8_t X,uint8_t Y,uint8_t Z,uint8_t F){
+  float result=0.0f;return functionValid&&evaluateBytecodeValue(X,Y,Z,F,result)&&result!=0.0f;
 }
 
 inline bool fourierCandidateIsFOnly(){
@@ -176,59 +180,39 @@ inline int32_t fourierEvaluateQ(uint8_t F){
 }
 inline bool tryCompileFourier(){
   fourier.valid=false;fourier.harmonics=0;
+  // Phase-1 safety boundary: only F-only expressions are Fourier candidates.
+  // Any X/Y/Z dependency stays on the existing bytecode path.
   if(!fourierCandidateIsFOnly())return false;
-  float samples[FOURIER_N];
-  for(uint8_t f=0;f<FOURIER_N;f++){
-    float stack[EVALUATOR_STACK_SIZE];uint8_t sp=0;float result=0.0f;
-    for(uint8_t i=0;i<bytecodeLength;i++){
-      const Instruction& ins=bytecode[i];
-      switch(ins.op){
-        case OP_END:result=sp?stack[sp-1]:0.0f;i=bytecodeLength;break;
-        case OP_CONST:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=ins.value;break;
-        case OP_F:if(sp>=EVALUATOR_STACK_SIZE)return false;stack[sp++]=f;break;
-        case OP_NEG:if(!sp)return false;stack[sp-1]=-stack[sp-1];break;
-        case OP_NOT:if(!sp)return false;stack[sp-1]=(stack[sp-1]==0.0f);break;
-        case OP_SIN:if(!sp)return false;stack[sp-1]=sin(stack[sp-1]);break;
-        case OP_COS:if(!sp)return false;stack[sp-1]=cos(stack[sp-1]);break;
-        case OP_SQRT:if(!sp)return false;stack[sp-1]=sqrt(max(0.0f,stack[sp-1]));break;
-        case OP_ABS:if(!sp)return false;stack[sp-1]=fabs(stack[sp-1]);break;
-        case OP_ADD:if(sp<2)return false;stack[sp-2]+=stack[--sp];break;
-        case OP_SUB:if(sp<2)return false;stack[sp-2]-=stack[--sp];break;
-        case OP_MUL:if(sp<2)return false;stack[sp-2]*=stack[--sp];break;
-        case OP_DIV:if(sp<2||stack[sp-1]==0.0f)return false;stack[sp-2]/=stack[--sp];break;
-        case OP_MOD:if(sp<2||stack[sp-1]==0.0f)return false;stack[sp-2]=fmod(stack[sp-2],stack[--sp]);break;
-        case OP_LT:if(sp<2)return false;stack[sp-2]=stack[sp-2]<stack[--sp];break;
-        case OP_LE:if(sp<2)return false;stack[sp-2]=stack[sp-2]<=stack[--sp];break;
-        case OP_GT:if(sp<2)return false;stack[sp-2]=stack[sp-2]>stack[--sp];break;
-        case OP_GE:if(sp<2)return false;stack[sp-2]=stack[sp-2]>=stack[--sp];break;
-        case OP_EQ:if(sp<2)return false;stack[sp-2]=stack[sp-2]==stack[--sp];break;
-        case OP_NE:if(sp<2)return false;stack[sp-2]=stack[sp-2]!=stack[--sp];break;
-        case OP_AND:if(sp<2)return false;stack[sp-2]=(stack[sp-2]!=0.0f)&&(stack[--sp]!=0.0f);break;
-        case OP_OR:if(sp<2)return false;stack[sp-2]=(stack[sp-2]!=0.0f)||(stack[--sp]!=0.0f);break;
-        default:return false;
-      }
-    }
-    samples[f]=result;
-  }
+
   for(uint8_t H=1;H<=FOURIER_MAX_HARMONICS;H++){
-    float dc=0.0f;for(uint8_t f=0;f<FOURIER_N;f++)dc+=samples[f];dc/=FOURIER_N;
     FourierRecord candidate;candidate.dc=0;candidate.harmonics=H;candidate.valid=false;
     for(uint8_t k=0;k<FOURIER_MAX_HARMONICS;k++){candidate.cosine[k]=0;candidate.sine[k]=0;}
-    if(!fourierQuantize(dc,candidate.dc))continue;
+
+    // One coefficient at a time keeps compile-time SRAM bounded: no 50-sample
+    // float array is retained on the Uno.
+    float sum=0.0f;
+    for(uint8_t f=0;f<FOURIER_N;f++){
+      float sample=0.0f;if(!evaluateBytecodeValue(0,0,0,f,sample))return false;sum+=sample;
+    }
+    if(!fourierQuantize(sum/(float)FOURIER_N,candidate.dc))continue;
+
     bool ok=true;
     for(uint8_t k=1;k<=H;k++){
       float ak=0.0f,bk=0.0f;
       for(uint8_t f=0;f<FOURIER_N;f++){
+        float sample=0.0f;if(!evaluateBytecodeValue(0,0,0,f,sample))return false;
         float phase=6.28318530718f*(float)k*(float)f/(float)FOURIER_N;
-        ak+=samples[f]*cos(phase);bk+=samples[f]*sin(phase);
+        ak+=sample*cos(phase);bk+=sample*sin(phase);
       }
       ak*=2.0f/(float)FOURIER_N;bk*=2.0f/(float)FOURIER_N;
       if(!fourierQuantize(ak,candidate.cosine[k-1])||!fourierQuantize(bk,candidate.sine[k-1])){ok=false;break;}
     }
     if(!ok)continue;
+
     fourier=candidate;bool exact=true;
     for(uint8_t f=0;f<FOURIER_N;f++){
-      if((samples[f]!=0.0f)!=(fourierEvaluateQ(f)!=0)){exact=false;break;}
+      float reference=0.0f;if(!evaluateBytecodeValue(0,0,0,f,reference)){exact=false;break;}
+      if((reference!=0.0f)!=(fourierEvaluateQ(f)!=0)){exact=false;break;}
     }
     if(exact){fourier.valid=true;return true;}
   }
